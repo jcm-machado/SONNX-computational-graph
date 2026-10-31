@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE why3session PUBLIC "-//Why3//proof session v5//EN"
+"https://www.why3.org/why3session.dtd">
+<why3session shape_version="6">
+<prover id="0" name="CVC5" version="1.2.1" timelimit="1" steplimit="0" memlimit="1000"/>
+<prover id="1" name="Alt-Ergo" version="2.4.3" timelimit="1" steplimit="0" memlimit="1000"/>
+<prover id="2" name="Z3" version="4.13.4" timelimit="1" steplimit="0" memlimit="1000"/>
+<file format="whyml" proved="true">
+<path name=".."/><path name="inductive.mlw"/>
+<theory name="AuxInvariant" proved="true">
+ <goal name="init_implies_unexec&#39;vc" expl="VC for init_implies_unexec" proved="true">
+ <proof prover="0"><result status="timeout" time="1.000000"/></proof>
+ <proof prover="1"><result status="timeout" time="1.000000" steps="38038"/></proof>
+ <proof prover="2"><result status="timeout" time="1.000000" steps="1834115"/></proof>
+ <transf name="split_vc" proved="true" >
+  <goal name="init_implies_unexec&#39;vc.0" expl="assertion" proved="true">
+  <proof prover="0" timelimit="5" memlimit="2000"><result status="valid" time="2.808044" steps="314071"/></proof>
+  </goal>
+  <goal name="init_implies_unexec&#39;vc.1" expl="postcondition" proved="true">
+  <proof prover="0"><result status="valid" time="0.639967" steps="122510"/></proof>
+  </goal>
+ </transf>
+ </goal>
+ <goal name="aux_inv_preservation&#39;vc" expl="VC for aux_inv_preservation" proved="true">
+ <proof prover="0"><result status="timeout" time="1.000000"/></proof>
+ <proof prover="1"><result status="timeout" time="1.000000" steps="40144"/></proof>
+ <proof prover="2"><result status="timeout" time="1.000000" steps="3859721"/></proof>
+ <transf name="split_vc" proved="true" >
+  <goal name="aux_inv_preservation&#39;vc.0" expl="precondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.005114" steps="10559"/></proof>
+  </goal>
+  <goal name="aux_inv_preservation&#39;vc.1" expl="precondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.018665" steps="145801"/></proof>
+  </goal>
+  <goal name="aux_inv_preservation&#39;vc.2" expl="precondition" proved="true">
+  <proof prover="0" timelimit="5" memlimit="2000"><result status="timeout" time="3.395988"/></proof>
+  <proof prover="1" timelimit="5" memlimit="2000"><result status="timeout" time="5.000000" steps="99866"/></proof>
+  <proof prover="2" timelimit="5" memlimit="2000"><result status="timeout" time="3.100400" steps="6438448"/></proof>
+  <transf name="inline_goal" proved="true" >
+   <goal name="aux_inv_preservation&#39;vc.2.0" expl="precondition" proved="true">
+   <transf name="split_all_full" proved="true" >
+    <goal name="aux_inv_preservation&#39;vc.2.0.0" expl="precondition" proved="true">
+    <proof prover="0" timelimit="30" memlimit="4000"><result status="timeout" time="19.294255"/></proof>
+    <proof prover="1" timelimit="30" memlimit="4000"><result status="timeout" time="30.000000" steps="336835"/></proof>
+    <proof prover="2" timelimit="30" memlimit="4000"><result status="timeout" time="13.498320" steps="13293581"/></proof>
+    <transf name="compute_in_goal" proved="true" >
+     <goal name="aux_inv_preservation&#39;vc.2.0.0.0" expl="precondition" proved="true">
+     <proof prover="0"><result status="valid" time="0.291013" steps="71570"/></proof>
+     </goal>
+    </transf>
+    </goal>
+   </transf>
+   </goal>
+  </transf>
+  </goal>
+  <goal name="aux_inv_preservation&#39;vc.3" expl="assertion" proved="true">
+  <proof prover="0" timelimit="5" memlimit="2000"><result status="timeout" time="3.388597"/></proof>
+  <proof prover="1" timelimit="5" memlimit="2000"><result status="timeout" time="5.000000" steps="107765"/></proof>
+  <proof prover="2" timelimit="5" memlimit="2000"><result status="timeout" time="3.073921" steps="6956558"/></proof>
+  <transf name="inline_goal" proved="true" >
+   <goal name="aux_inv_preservation&#39;vc.3.0" expl="assertion" proved="true">
+   <transf name="split_all_full" proved="true" >
+    <goal name="aux_inv_preservation&#39;vc.3.0.0" expl="assertion" proved="true">
+    <proof prover="0" timelimit="30" memlimit="4000"><result status="timeout" time="19.326963"/></proof>
+    <proof prover="1" timelimit="30" memlimit="4000"><result status="timeout" time="30.000000" steps="342524"/></proof>
+    <proof prover="2" timelimit="30" memlimit="4000"><result status="timeout" time="13.069567" steps="20870803"/></proof>
+    <transf name="compute_in_goal" proved="true" >
+     <goal name="aux_inv_preservation&#39;vc.3.0.0.0" expl="assertion" proved="true">
+     <proof prover="0"><result status="valid" time="0.268044" steps="81695"/></proof>
+     </goal>
+    </transf>
+    </goal>
+   </transf>
+   </goal>
+  </transf>
+  </goal>
+  <goal name="aux_inv_preservation&#39;vc.4" expl="assertion" proved="true">
+  <proof prover="1"><result status="valid" time="0.622448" steps="17288"/></proof>
+  </goal>
+  <goal name="aux_inv_preservation&#39;vc.5" expl="assertion" proved="true">
+  <proof prover="0" timelimit="30" memlimit="4000"><result status="valid" time="16.562890" steps="803954"/></proof>
+  </goal>
+  <goal name="aux_inv_preservation&#39;vc.6" expl="postcondition" proved="true">
+  <proof prover="1"><result status="valid" time="0.283141" steps="7972"/></proof>
+  </goal>
+ </transf>
+ </goal>
+</theory>
+<theory name="MainInvariant" proved="true">
+ <goal name="init_no_preds&#39;vc" expl="VC for init_no_preds" proved="true">
+ <proof prover="0"><result status="timeout" time="1.000000"/></proof>
+ <proof prover="1"><result status="timeout" time="1.000000" steps="42438"/></proof>
+ <proof prover="2"><result status="timeout" time="1.000000" steps="2315141"/></proof>
+ <transf name="split_vc" proved="true" >
+  <goal name="init_no_preds&#39;vc.0" expl="assertion" proved="true">
+  <proof prover="0" timelimit="5" memlimit="2000"><result status="timeout" time="5.000000"/></proof>
+  <proof prover="1" timelimit="5" memlimit="2000"><result status="timeout" time="5.000000" steps="94896"/></proof>
+  <proof prover="2" timelimit="5" memlimit="2000"><result status="timeout" time="5.000000" steps="3259487"/></proof>
+  <transf name="inline_goal" proved="true" >
+   <goal name="init_no_preds&#39;vc.0.0" expl="assertion" proved="true">
+   <transf name="split_all_full" proved="true" >
+    <goal name="init_no_preds&#39;vc.0.0.0" expl="assertion" proved="true">
+    <proof prover="0"><result status="valid" time="0.092267" steps="44699"/></proof>
+    </goal>
+   </transf>
+   </goal>
+  </transf>
+  </goal>
+  <goal name="init_no_preds&#39;vc.1" expl="variant decrease" proved="true">
+  <proof prover="2"><result status="valid" time="0.007009" steps="33925"/></proof>
+  </goal>
+  <goal name="init_no_preds&#39;vc.2" expl="precondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.005461" steps="11725"/></proof>
+  </goal>
+  <goal name="init_no_preds&#39;vc.3" expl="precondition" proved="true">
+  <proof prover="1"><result status="valid" time="0.685096" steps="28120"/></proof>
+  </goal>
+  <goal name="init_no_preds&#39;vc.4" expl="precondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.005506" steps="11735"/></proof>
+  </goal>
+  <goal name="init_no_preds&#39;vc.5" expl="precondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.005627" steps="11740"/></proof>
+  </goal>
+  <goal name="init_no_preds&#39;vc.6" expl="precondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.006186" steps="11749"/></proof>
+  </goal>
+  <goal name="init_no_preds&#39;vc.7" expl="unreachable point" proved="true">
+  <proof prover="2"><result status="valid" time="0.006294" steps="11674"/></proof>
+  </goal>
+  <goal name="init_no_preds&#39;vc.8" expl="unreachable point" proved="true">
+  <proof prover="2"><result status="valid" time="0.005768" steps="11663"/></proof>
+  </goal>
+  <goal name="init_no_preds&#39;vc.9" expl="postcondition" proved="true">
+  <proof prover="0"><result status="valid" time="0.156508" steps="53102"/></proof>
+  </goal>
+ </transf>
+ </goal>
+ <goal name="inv_preservation&#39;vc" expl="VC for inv_preservation" proved="true">
+ <proof prover="0"><result status="timeout" time="1.000000"/></proof>
+ <proof prover="1"><result status="timeout" time="1.000000" steps="50991"/></proof>
+ <proof prover="2"><result status="timeout" time="1.000000" steps="7564373"/></proof>
+ <transf name="split_vc" proved="true" >
+  <goal name="inv_preservation&#39;vc.0" expl="assertion" proved="true">
+  <proof prover="2"><result status="valid" time="0.697833" steps="2842971"/></proof>
+  </goal>
+  <goal name="inv_preservation&#39;vc.1" expl="assertion" proved="true">
+  <proof prover="2"><result status="valid" time="0.048681" steps="352367"/></proof>
+  </goal>
+  <goal name="inv_preservation&#39;vc.2" expl="assertion" proved="true">
+  <proof prover="2"><result status="valid" time="0.236489" steps="1458377"/></proof>
+  </goal>
+  <goal name="inv_preservation&#39;vc.3" expl="assertion" proved="true">
+  <proof prover="0"><result status="valid" time="0.195104" steps="46791"/></proof>
+  </goal>
+  <goal name="inv_preservation&#39;vc.4" expl="variant decrease" proved="true">
+  <proof prover="2"><result status="valid" time="0.007292" steps="34115"/></proof>
+  </goal>
+  <goal name="inv_preservation&#39;vc.5" expl="precondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.006674" steps="11795"/></proof>
+  </goal>
+  <goal name="inv_preservation&#39;vc.6" expl="precondition" proved="true">
+  <proof prover="0"><result status="valid" time="0.157722" steps="44712"/></proof>
+  </goal>
+  <goal name="inv_preservation&#39;vc.7" expl="precondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.009665" steps="11809"/></proof>
+  </goal>
+  <goal name="inv_preservation&#39;vc.8" expl="precondition" proved="true">
+  <proof prover="0"><result status="valid" time="0.085145" steps="29836"/></proof>
+  </goal>
+  <goal name="inv_preservation&#39;vc.9" expl="precondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.006175" steps="11827"/></proof>
+  </goal>
+  <goal name="inv_preservation&#39;vc.10" expl="assertion" proved="true">
+  <proof prover="2"><result status="valid" time="0.005647" steps="11800"/></proof>
+  </goal>
+  <goal name="inv_preservation&#39;vc.11" expl="assertion" proved="true">
+  <proof prover="0"><result status="valid" time="0.061058" steps="22629"/></proof>
+  </goal>
+  <goal name="inv_preservation&#39;vc.12" expl="assertion" proved="true">
+  <proof prover="0"><result status="valid" time="0.089624" steps="28578"/></proof>
+  </goal>
+  <goal name="inv_preservation&#39;vc.13" expl="assertion" proved="true">
+  <proof prover="2"><result status="valid" time="0.111634" steps="506012"/></proof>
+  </goal>
+  <goal name="inv_preservation&#39;vc.14" expl="assertion" proved="true">
+  <proof prover="0"><result status="valid" time="0.165474" steps="49785"/></proof>
+  </goal>
+  <goal name="inv_preservation&#39;vc.15" expl="unreachable point" proved="true">
+  <proof prover="0"><result status="valid" time="0.175845" steps="49282"/></proof>
+  </goal>
+  <goal name="inv_preservation&#39;vc.16" expl="unreachable point" proved="true">
+  <proof prover="2"><result status="valid" time="0.008660" steps="11767"/></proof>
+  </goal>
+  <goal name="inv_preservation&#39;vc.17" expl="unreachable point" proved="true">
+  <proof prover="2"><result status="valid" time="0.008633" steps="11756"/></proof>
+  </goal>
+  <goal name="inv_preservation&#39;vc.18" expl="postcondition" proved="true">
+  <proof prover="0"><result status="timeout" time="1.000000"/></proof>
+  <proof prover="1"><result status="timeout" time="1.000000" steps="30202"/></proof>
+  <proof prover="2"><result status="timeout" time="1.000000" steps="3818573"/></proof>
+  <transf name="split_vc" proved="true" >
+   <goal name="inv_preservation&#39;vc.18.0" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.731365" steps="135818"/></proof>
+   </goal>
+   <goal name="inv_preservation&#39;vc.18.1" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.962509" steps="172481"/></proof>
+   </goal>
+  </transf>
+  </goal>
+ </transf>
+ </goal>
+</theory>
+<theory name="InductiveInvariants" proved="true">
+ <goal name="initGraph&#39;vc" expl="VC for initGraph" proved="true">
+ <proof prover="1"><result status="valid" time="0.016636" steps="133"/></proof>
+ </goal>
+ <goal name="aux_inv_manySteps" proved="true">
+ <transf name="induction_pr" proved="true" >
+  <goal name="aux_inv_manySteps.0" proved="true">
+  <proof prover="2"><result status="valid" time="0.008589" steps="10970"/></proof>
+  </goal>
+  <goal name="aux_inv_manySteps.1" proved="true">
+  <proof prover="1"><result status="valid" time="0.017520" steps="135"/></proof>
+  </goal>
+ </transf>
+ </goal>
+ <goal name="aux_inv_reachable" proved="true">
+ <proof prover="1"><result status="valid" time="0.027693" steps="780"/></proof>
+ </goal>
+ <goal name="inv_manySteps" proved="true">
+ <proof prover="1"><result status="valid" time="0.023603" steps="220"/></proof>
+ </goal>
+ <goal name="inv_reachable" proved="true">
+ <proof prover="1"><result status="valid" time="0.158917" steps="7037"/></proof>
+ </goal>
+</theory>
+</file>
+</why3session>

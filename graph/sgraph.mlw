@@ -1,0 +1,378 @@
+module Graph
+    use list.List
+    use list.NumOcc
+    use list.Mem
+    use list.Append
+    use map.Map
+    use option.Option
+    use entities.TensorInstance
+    use entities.ComputationNode
+    use entities.TensorValue
+    use entities.State
+    use utils.Utils
+    use utils.GraphUtils
+
+    type graph = {
+        gis: list tensor_instance;  (* graph inputs *)
+        gos: list tensor_instance;  (* graph outputs *)
+        cns: list computation_node; (* computation nodes *)
+        its: list tensor_instance;  (* intermediate tensors *)
+        state: state;               (* state map *)
+     }
+    (* Unique tensor-instances *)
+    invariant {
+        let tis = gis ++ gos ++ its in
+        forall ti:tensor_instance. Mem.mem ti tis -> num_occ ti tis = 1
+    }
+    (* Unique computation-node identifiers *)
+    invariant{
+        let cn_ids = cn_get_ids cns in
+        forall id:int. Mem.mem id cn_ids -> num_occ id cn_ids = 1      
+    }
+    (* Input closure *)
+    invariant {
+        let inp_tis = gis ++ its in
+        let inTids = cn_get_inps cns in
+        forall ti: tensor_instance. Mem.mem ti inTids -> Mem.mem ti inp_tis
+    }
+    (* Output closure *)
+    invariant {
+        let out_tis = gos ++ its in
+        let outTids = cn_get_outs cns in
+        forall ti: tensor_instance. Mem.mem ti outTids -> Mem.mem ti out_tis
+    }
+    (* Unique producer *)
+    invariant {
+        let outTids = cn_get_outs cns in
+        forall ti:tensor_instance. Mem.mem ti outTids -> num_occ ti outTids = 1
+    }
+    (* Tensor coverage *)
+    invariant{
+        let tis = gis ++ gos ++ its in
+        let inTids = cn_get_inps cns in
+        let outTids = cn_get_outs cns in
+        forall ti: tensor_instance. Mem.mem ti tis -> 
+            ((Mem.mem ti inTids) \/ (Mem.mem ti outTids))
+    }
+    (* In tensor condition *)
+    invariant{
+        let tis = gis ++ gos ++ its in
+        let outTids = cn_get_outs cns in
+        forall ti: tensor_instance. Mem.mem ti tis ->
+            (not (Mem.mem ti outTids) <-> Mem.mem ti gis)
+    }
+    (* Out tensor condition *)
+    invariant{
+        let tis = gis ++ gos ++ its in
+        let inTids = cn_get_inps cns in
+        forall ti: tensor_instance. Mem.mem ti tis ->
+            (not (Mem.mem ti inTids) <-> Mem.mem ti gos)
+    }
+    (* Valued graph inputs *)
+    invariant{
+        forall ti:tensor_instance. Mem.mem ti gis -> is_some (state ti)
+    }
+    (* Atomic output production *)
+    invariant{
+        forall c: computation_node. Mem.mem c cns ->
+            (forall t: tensor_value. Mem.mem t (get_tensors c.out state) -> is_some t) \/
+            (forall t: tensor_value. Mem.mem t (get_tensors c.out state) -> is_none t)
+    }
+    (* Acyclicity *)
+    invariant {
+        forall c: computation_node. Mem.mem c cns -> not (has_cycle c gis gos cns)
+    }
+    (* Reachability *)
+    invariant{
+        forall c:computation_node. Mem.mem c cns -> 
+            (exists og: tensor_instance. (Mem.mem og gos) /\ 
+            (reachable (C c) og gis gos cns))
+    }
+    (*
+    invariant{
+        forall gi:tensor_instance. Mem.mem gi gis -> 
+            (exists og: tensor_instance. (Mem.mem og gos) /\ 
+            (reachable (T gi) og gis gos cns))
+    }
+    *)
+    (* Extra *)
+    (* State consistency *)
+    invariant{
+        let tis = gis ++ gos ++ its in
+        forall ti: tensor_instance. not (Mem.mem ti tis) -> state ti = None
+    }
+    by { gis = Nil; gos = Nil; cns = Nil; its = Nil; state = (fun _ -> None) }
+
+    (* Equal Graphs *)
+    predicate (==) (a b : graph) =
+    a.gis = b.gis /\
+    a.gos = b.gos /\
+    a.cns = b.cns /\
+    a.its = b.its /\
+    a.state = b.state
+
+    (* Extensionality *)
+    lemma exteq: forall a b : graph. a == b <-> a = b
+    by graph'eq a b
+
+    lemma eq:
+        forall g: graph, ti: tensor_instance.
+            let tis = g.gis ++ g.gos ++ g.its in
+            let inp_tis = g.gis ++ g.its in
+            let out_tis = g.gos ++ g.its in
+            let inTids = cn_get_inps g.cns in
+            let outTids = cn_get_outs g.cns in
+            Mem.mem ti tis 
+            <-> 
+            (Mem.mem ti inTids \/ Mem.mem ti outTids)
+            <->
+            (Mem.mem ti inp_tis \/ Mem.mem ti out_tis)
+end
+
+module ExecutionFunctions
+    use int.Int
+    use list.Mem
+    use list.List
+    use list.Length
+    use list.Append
+    use entities.TensorValue
+    use entities.TensorInstance
+    use entities.Operator
+    use entities.ComputationNode
+    use entities.State
+    use utils.Utils
+    use utils.GraphUtils
+    use add.OPAddGraph
+    use matmul.OPMatmulGraph
+    use sigmoid.OPSigmoidGraph
+    use Graph
+
+    predicate constraints_compliance (c: computation_node) (inputs: list tensor_value)
+    =
+    match c.op with
+        | Add -> 
+            let t0 = get_tensor inputs 0 in
+            let t1 = get_tensor inputs 1 in
+            OPAddGraph.constraints t0 t1
+        | Sigmoid ->
+            let t0 = get_tensor inputs 0 in
+            OPSigmoidGraph.constraints t0
+        | Matmul ->
+            let t0 = get_tensor inputs 0 in
+            let t1 = get_tensor inputs 1 in
+            OPMatmulGraph.constraints t0 t1
+        | _ -> False
+    end
+
+    predicate is_executable (c: computation_node) (g: graph)
+    =
+    let inputs = Utils.get_tensors c.inp g.state in
+    let outputs = Utils.get_tensors c.out g.state in
+    Mem.mem c g.cns /\
+    computed inputs /\
+    not_computed outputs /\
+    constraints_compliance c inputs
+
+    let ghost function op_exec (c: computation_node) (inputs: list tensor_value) : list tensor_value
+    requires { constraints_compliance c inputs }
+    requires { length inputs = n_inputs c.op }
+    ensures { length result = n_outputs c.op }
+    ensures { forall t: tensor_value. Mem.mem t result -> is_some t }
+    =
+    match c.op with
+        | Add ->
+            let t0 = get_tensor inputs 0 in
+            let t1 = get_tensor inputs 1 in
+            Cons (OPAddGraph.add_graph t0 t1) Nil
+        | Sigmoid ->
+            let t0 = get_tensor inputs 0 in
+            Cons (OPSigmoidGraph.sigmoid_graph t0) Nil
+        | Matmul ->
+            let t0 = get_tensor inputs 0 in
+            let t1 = get_tensor inputs 1 in
+            Cons (OPMatmulGraph.matmul_graph t0 t1) Nil
+        | _ -> Nil
+    end
+
+    function update (ti': tensor_instance) (t: tensor_value) (s: state) : state =
+    fun ti -> if ti = ti' then t else s ti
+
+    let rec ghost function update_all (tis: list tensor_instance) (ts: list tensor_value) (s: state) : state
+    requires { length tis = length ts }
+    =
+    match tis, ts with
+    | Cons ti rest_tis, Cons t rest_ts -> update_all rest_tis rest_ts (update ti t s)
+    | _, _ -> s
+    end
+end
+
+
+module ExecutionProperties
+    use int.Int
+    use list.Mem
+    use list.List
+    use list.Length
+    use list.Append
+    use entities.TensorValue
+    use entities.TensorInstance
+    use entities.ComputationNode
+    use entities.State
+    use utils.Utils
+    use utils.GraphUtils
+    use add.OPAddGraph
+    use matmul.OPMatmulGraph
+    use sigmoid.OPSigmoidGraph
+    use Graph
+    use ExecutionFunctions 
+
+    (* Update characterization *)
+    let lemma update_behaviour (ti': tensor_instance) (t: tensor_value) (s: state)
+    ensures { (update ti' t s) ti' = t }
+    ensures { forall ti: tensor_instance. ti <> ti' -> (update ti' t s) ti = s ti }
+    =
+    ()
+
+    (* Update_all characterization *)
+    let rec lemma update_all_behaviour (tis: list tensor_instance) (ts: list tensor_value) (s: state)
+    requires { length tis = length ts }
+    ensures { forall ti: tensor_instance. Mem.mem ti tis -> (exists t: tensor_value. Mem.mem t ts /\ ((update_all tis ts s) ti = t)) }
+    ensures { forall ti: tensor_instance. not (Mem.mem ti tis) -> ((update_all tis ts s) ti = s ti) }
+    =
+    match tis, ts with
+    | Cons ti rest_tis, Cons t rest_ts ->
+        update_behaviour ti t s;
+        update_all_behaviour rest_tis rest_ts (update ti t s);
+    | _, _ -> ()
+    end
+
+
+    (* The output of given computation_node is among the collection of outputs of any list containing that computation node *)
+    let rec lemma output_ocurrence (c: computation_node) (cns: list computation_node) (ti: tensor_instance)
+    requires { Mem.mem ti c.out }
+    requires { Mem.mem c cns }
+    ensures { NumOcc.num_occ ti (cn_get_outs cns) >= 1 }
+    variant { cns }
+    =
+    match cns with
+    | Nil -> ()
+    | Cons h t ->
+        if Mem.mem c t then
+            output_ocurrence c t ti
+        else
+            assert { NumOcc.num_occ ti h.out >= 1 }
+    end
+    
+    let rec lemma outputs_ocurrence (c c': computation_node) (cns: list computation_node) (ti: tensor_instance)
+    requires { Mem.mem ti c.out }
+    requires { Mem.mem ti c'.out }
+    requires { Mem.mem c cns }
+    requires { Mem.mem c' cns }
+    requires { c <> c' }
+    ensures { NumOcc.num_occ ti (cn_get_outs cns) > 1 }
+    variant { cns }
+    =
+    match cns with
+    | Nil -> ()
+    | Cons h t ->
+        if not (Mem.mem c t) then
+            output_ocurrence c' t ti
+        else if not (Mem.mem c' t) then
+            output_ocurrence c t ti
+        else begin 
+            outputs_ocurrence c c' t ti;
+            assert { cn_get_outs cns = h.out ++ cn_get_outs t };
+            assert { NumOcc.num_occ ti (cn_get_outs cns) >= NumOcc.num_occ ti (cn_get_outs t) }
+        end
+    end
+
+    let lemma outputs_disjoint (c c': computation_node) (g: graph)
+    requires { Mem.mem c g.cns }
+    requires { Mem.mem c' g.cns }
+    requires { c <> c' }
+    ensures { forall ti: tensor_instance. Mem.mem ti c.out -> not (Mem.mem ti c'.out) }
+    =
+    ()
+
+    (* Applying get_tensors in the same tis collection over two states that coincide within that collection yields the same result *)
+    let rec lemma state_equiv (tis: list tensor_instance) (s1 s2: state)
+    requires { forall ti: tensor_instance. Mem.mem ti tis -> s1 ti = s2 ti }
+    ensures { Utils.get_tensors tis s1 = Utils.get_tensors tis s2 }
+    = 
+    match tis with
+    | Nil -> ()
+    | Cons ti rest ->
+        assert { s1 ti = s2 ti };
+        state_equiv rest s1 s2
+    end
+
+    (* Proved because of the :
+        - characterization lemma - update_all_behaviour 
+        - state_equivalence lemma - state_equiv
+        - disjointness of nodes outputs - outputs_disjoint
+    *)
+    let lemma update_all_disjoint (c c': computation_node) (ts: list tensor_value) (g: graph)
+    requires { Mem.mem c g.cns }
+    requires { Mem.mem c' g.cns }
+    requires { c <> c' }
+    requires { length ts = length c.out }
+    ensures { Utils.get_tensors c'.out (update_all c.out ts g.state) = Utils.get_tensors c'.out g.state }
+    =
+    ()
+
+end
+
+
+module GraphExecution
+    use int.Int
+    use list.Mem
+    use list.List
+    use list.Length
+    use list.Append
+    use entities.TensorValue
+    use entities.TensorInstance
+    use entities.ComputationNode
+    use entities.State
+    use utils.Utils
+    use utils.GraphUtils
+    use add.OPAddGraph
+    use matmul.OPMatmulGraph
+    use sigmoid.OPSigmoidGraph
+    use Graph
+    use ExecutionFunctions
+    use ExecutionProperties
+
+    let ghost function execute (c: computation_node) (g: graph) : graph
+    requires { is_executable c g }
+    ensures { g.cns = result.cns }
+    ensures { g.gis = result.gis }
+    ensures { g.gos = result.gos }
+    ensures { g.its = result.its }
+    ensures { result.state = update_all c.out (op_exec c (Utils.get_tensors c.inp g.state)) g.state }
+    =
+    let inputs = Utils.get_tensors c.inp g.state in
+    let op_outputs = op_exec c inputs in
+    let new_state = update_all c.out op_outputs g.state in
+    (*
+    assert{ Utils.get_tensors c.out new_state = op_outputs };
+    assert{ forall c': computation_node. (Mem.mem c' g.cns /\ c' <> c) -> Utils.get_tensors c'.out new_state = Utils.get_tensors c'.out g.state };
+    *)
+    {
+        gis = g.gis;
+        gos = g.gos;
+        cns = g.cns;
+        its = g.its;
+        state = new_state;
+    }
+
+    inductive stepind (g g': graph) =
+    | Step_Inductive:
+        forall c: computation_node, g g': graph.
+            (is_executable c g /\ g' = execute c g) -> stepind g g'
+
+    inductive steps (g g': graph) (n :int) =
+    | Steps_Reflexive: 
+        forall g: graph. steps g g 0
+    | Steps_Transitive:
+        forall g1 g2 g3: graph, n:int.
+            steps g1 g2 n -> stepind g2 g3 -> steps g1 g3 (n + 1)
+end

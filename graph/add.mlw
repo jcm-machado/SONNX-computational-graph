@@ -1,0 +1,132 @@
+module OPAdd
+    use tensor.Tensor
+    use tensor.Range
+    use real.Real
+
+    predicate constraints (a b : tensor real)
+    =
+    a ~= b
+
+    function dadd (a b : tensor real) : data real
+    =
+    fun ks ->
+        if valid ks a.dims then
+            a.data ks + b.data ks
+        else
+            a.background
+    
+    let ghost function add (a b : tensor real) : tensor real
+    requires { constraints a b }
+    ensures { result ~= a ~= b }
+    ensures { result.data = dadd a b }
+    =
+    { dims = a.dims; data = dadd a b; background = a.background }
+        
+end
+
+module OPAddGraph
+    use option.Option
+    use entities.WrapperTensor
+    use entities.TensorValue
+    use OPAdd
+
+    predicate constraints (a b : tensor_value)
+    = 
+    match a,b with
+        | Some a , Some b -> match a, b with
+            | R a_real, R b_real -> OPAdd.constraints a_real b_real
+            | _ -> false
+        end
+        | _, _ -> false
+    end
+    
+    let ghost function add_graph (a b : tensor_value) : tensor_value
+    requires { constraints a b }
+    =
+    match a,b with
+        | Some a, Some b ->
+            match a, b with
+            | R a_real, R b_real -> Some (R (OPAdd.add a_real b_real))
+            | _ -> absurd
+            end
+        | _, _ -> absurd
+    end
+end
+
+module COPAdd
+    use OPAdd
+    use int.Int
+    use mach.int.Int32
+    use tensor.Tensor
+    use libtensor.CTensor
+    use libvector.CIndex
+    use std.Cfloat
+    use std.Clib
+
+    let ctensor_add (a b r : ctensor)
+    requires { valid_tensor a }
+    requires { valid_tensor b }
+    requires { valid_tensor r }
+    requires { ref_tensor a ~= ref_tensor b ~= ref_tensor r }
+    ensures { ref_tensor r == add (ref_tensor a) (ref_tensor b) }
+    =
+    let m = cdim_size r.t_dims r.t_rank in
+    for i = 0 to m-1 do
+        invariant { forall k. 0 <= k < i -> value_at r.t_data k = value_at a.t_data k .+ value_at b.t_data k}
+        r.t_data[i] <- a.t_data[i] .+ b.t_data[i]
+    done;
+    assert { ref_tensor r == add (ref_tensor a) (ref_tensor b) }
+
+end
+
+module COPAddGraph
+    use mach.c.C
+    use int.Int
+    (*use map.Map*)
+    (*use option.Option*)
+    use array.Array
+    use centities.CEntities
+    use libtensor.CTensor
+    use tensor.Tensor
+    use COPAdd
+    use std.Clib
+
+    predicate constraints (a b r: ctensor_value) =
+        let a' = a.value in
+        let b' = b.value in
+        let r' = r.value in
+        valid_tensor a' /\
+        valid_tensor b' /\
+        valid_tensor r' /\
+        ref_tensor a' ~= ref_tensor b' ~= ref_tensor r'
+
+    let cadd_graph (a b r: ctensor_value)
+    requires { constraints a b r }
+    =
+    ctensor_add a.value b.value r.value
+
+    val get (p:ptr ctensor_value) : ctensor_value
+    requires { p.min <= p.offset < p.max }
+    ensures { result = Map.get (pelts p) (p.offset) }
+
+    val set (p:ptr ctensor_value) (v:ctensor_value) : unit
+    requires { p.min <= p.offset < p.max }
+    requires { writable p }
+    ensures { pelts p = Map.set (pelts (old p)) p.offset v }
+    writes { C.(p.data.elts) }
+
+    let cadd_graph_ptr (a: ctensor_value) (b: ctensor_value) (r: ptr ctensor_value)
+    requires { constraints a b (Map.get (pelts r) (r.offset)) }
+    requires { valid_range r 0 1 }
+    requires { writable r }
+    ensures { (Map.get (pelts r) (r.offset)).CEntities.computed = true }
+    ensures { CTensor.ref_tensor (Map.get (pelts r) (r.offset)).value = OPAdd.add (CTensor.ref_tensor a.value) (CTensor.ref_tensor b.value) }
+    ensures { forall j: int. j <> r.offset -> Map.get (pelts r) j = Map.get (pelts (old r)) j }
+    ensures { CTensor.valid_tensor (Map.get (pelts r) r.offset).value }
+    =
+    let ref r_val = get r in
+    ctensor_add a.value b.value r_val.value;
+    r_val.computed <- true;
+    set r r_val
+
+end

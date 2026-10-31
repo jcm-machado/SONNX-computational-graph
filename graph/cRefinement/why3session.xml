@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE why3session PUBLIC "-//Why3//proof session v5//EN"
+"https://www.why3.org/why3session.dtd">
+<why3session shape_version="6">
+<prover id="0" name="CVC5" version="1.2.1" timelimit="1" steplimit="0" memlimit="1000"/>
+<prover id="1" name="Alt-Ergo" version="2.4.3" timelimit="1" steplimit="0" memlimit="1000"/>
+<prover id="2" name="Z3" version="4.13.4" timelimit="1" steplimit="0" memlimit="1000"/>
+<file format="whyml" proved="true">
+<path name=".."/><path name="cRefinement.mlw"/>
+<theory name="Refinement" proved="true">
+ <goal name="ref_state&#39;vc" expl="VC for ref_state" proved="true">
+ <proof prover="2"><result status="valid" time="0.007014" steps="9381"/></proof>
+ </goal>
+ <goal name="ref_computation_node&#39;vc" expl="VC for ref_computation_node" proved="true">
+ <proof prover="2"><result status="valid" time="0.018630" steps="153502"/></proof>
+ </goal>
+ <goal name="ref_cns_from&#39;vc" expl="VC for ref_cns_from" proved="true">
+ <proof prover="1"><result status="valid" time="0.028868" steps="462"/></proof>
+ </goal>
+ <goal name="ref_cns&#39;vc" expl="VC for ref_cns" proved="true">
+ <proof prover="2"><result status="valid" time="0.005620" steps="9769"/></proof>
+ </goal>
+ <goal name="slice_cn_valid&#39;vc" expl="VC for slice_cn_valid" proved="true">
+ <proof prover="1"><result status="valid" time="0.023040" steps="320"/></proof>
+ </goal>
+ <goal name="slice_cn_build_mem&#39;vc" expl="VC for slice_cn_build_mem" proved="true">
+ <proof prover="1"><result status="valid" time="0.089509" steps="1895"/></proof>
+ </goal>
+ <goal name="ref_gis_mem&#39;vc" expl="VC for ref_gis_mem" proved="true">
+ <proof prover="1"><result status="valid" time="0.078713" steps="3232"/></proof>
+ </goal>
+ <goal name="ref_gos_mem&#39;vc" expl="VC for ref_gos_mem" proved="true">
+ <proof prover="1"><result status="valid" time="0.079748" steps="3325"/></proof>
+ </goal>
+ <goal name="ref_its_mem&#39;vc" expl="VC for ref_its_mem" proved="true">
+ <proof prover="1"><result status="valid" time="0.080016" steps="3429"/></proof>
+ </goal>
+ <goal name="ref_gis_unique&#39;vc" expl="VC for ref_gis_unique" proved="true">
+ <proof prover="1"><result status="valid" time="0.182205" steps="8971"/></proof>
+ </goal>
+ <goal name="unique_tail&#39;vc" expl="VC for unique_tail" proved="true">
+ <proof prover="0"><result status="timeout" time="1.000000"/></proof>
+ <proof prover="1"><result status="timeout" time="1.000000" steps="19710"/></proof>
+ <proof prover="2"><result status="timeout" time="1.000000" steps="4666403"/></proof>
+ <transf name="split_vc" proved="true" >
+  <goal name="unique_tail&#39;vc.0" expl="assertion" proved="true">
+  <proof prover="2"><result status="valid" time="0.025749" steps="211686"/></proof>
+  </goal>
+  <goal name="unique_tail&#39;vc.1" expl="postcondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.710493" steps="3295232"/></proof>
+  </goal>
+ </transf>
+ </goal>
+ <goal name="ref_gos_unique&#39;vc" expl="VC for ref_gos_unique" proved="true">
+ <proof prover="1"><result status="valid" time="0.316156" steps="13025"/></proof>
+ </goal>
+ <goal name="ref_its_unique&#39;vc" expl="VC for ref_its_unique" proved="true">
+ <proof prover="1"><result status="valid" time="0.310084" steps="13156"/></proof>
+ </goal>
+ <goal name="ref_cns_from_unique_ids&#39;vc" expl="VC for ref_cns_from_unique_ids" proved="true">
+ <proof prover="1"><result status="valid" time="0.853053" steps="38888"/></proof>
+ </goal>
+ <goal name="ref_graph&#39;vc" expl="VC for ref_graph" proved="true">
+ <proof prover="0"><result status="timeout" time="1.000000"/></proof>
+ <proof prover="1"><result status="timeout" time="1.000000" steps="34911"/></proof>
+ <proof prover="2"><result status="timeout" time="1.000000" steps="4805286"/></proof>
+ <transf name="split_vc" proved="true" >
+  <goal name="ref_graph&#39;vc.0" expl="precondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.068693" steps="434246"/></proof>
+  </goal>
+  <goal name="ref_graph&#39;vc.1" expl="precondition" proved="true">
+  <proof prover="1"><result status="valid" time="0.596385" steps="6659"/></proof>
+  </goal>
+  <goal name="ref_graph&#39;vc.2" expl="precondition" proved="true">
+  <proof prover="1" timelimit="5" memlimit="2000"><result status="valid" time="2.869025" steps="82438"/></proof>
+  </goal>
+  <goal name="ref_graph&#39;vc.3" expl="precondition" proved="true">
+  <proof prover="0"><result status="timeout" time="1.000000"/></proof>
+  <proof prover="1"><result status="timeout" time="1.000000" steps="36395"/></proof>
+  <proof prover="2"><result status="timeout" time="0.789402" steps="2219069"/></proof>
+  <transf name="split_vc" proved="true" >
+   <goal name="ref_graph&#39;vc.3.0" expl="precondition" proved="true">
+   <proof prover="1" timelimit="30" memlimit="4000"><result status="valid" time="13.091179" steps="210012"/></proof>
+   </goal>
+  </transf>
+  </goal>
+  <goal name="ref_graph&#39;vc.4" expl="precondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.054930" steps="307306"/></proof>
+  </goal>
+  <goal name="ref_graph&#39;vc.5" expl="precondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.044987" steps="308468"/></proof>
+  </goal>
+  <goal name="ref_graph&#39;vc.6" expl="precondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.051672" steps="300704"/></proof>
+  </goal>
+  <goal name="ref_graph&#39;vc.7" expl="precondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.104429" steps="527652"/></proof>
+  </goal>
+  <goal name="ref_graph&#39;vc.8" expl="precondition" proved="true">
+  <proof prover="1"><result status="valid" time="0.256758" steps="8233"/></proof>
+  </goal>
+  <goal name="ref_graph&#39;vc.9" expl="precondition" proved="true">
+  <proof prover="1"><result status="valid" time="0.199232" steps="6555"/></proof>
+  </goal>
+  <goal name="ref_graph&#39;vc.10" expl="precondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.062217" steps="313164"/></proof>
+  </goal>
+  <goal name="ref_graph&#39;vc.11" expl="precondition" proved="true">
+  <proof prover="1"><result status="valid" time="0.380588" steps="14837"/></proof>
+  </goal>
+  <goal name="ref_graph&#39;vc.12" expl="precondition" proved="true">
+  <proof prover="1"><result status="valid" time="0.051658" steps="911"/></proof>
+  </goal>
+  <goal name="ref_graph&#39;vc.13" expl="precondition" proved="true">
+  <proof prover="1"><result status="valid" time="0.136567" steps="4397"/></proof>
+  </goal>
+  <goal name="ref_graph&#39;vc.14" expl="precondition" proved="true">
+  <proof prover="0"><result status="valid" time="0.082704" steps="29840"/></proof>
+  </goal>
+  <goal name="ref_graph&#39;vc.15" expl="postcondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.009559" steps="20333"/></proof>
+  </goal>
+  <goal name="ref_graph&#39;vc.16" expl="postcondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.007208" steps="13912"/></proof>
+  </goal>
+ </transf>
+ </goal>
+</theory>
+</file>
+</why3session>

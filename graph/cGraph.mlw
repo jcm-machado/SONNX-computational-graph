@@ -1,0 +1,11 @@
+module CGraph
+    use mach.c.C
+    use mach.int.Int32
+    use centities.CEntities
+
+    type cgraph = {
+        state: cstate;
+        cns: ptr ccomputation_node;
+        num_cns: int32;
+    }
+end

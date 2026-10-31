@@ -1,0 +1,250 @@
+module AuxInvariant
+    use int.Int
+    use list.Mem
+    use list.List
+    use list.Length
+    use list.Append
+    use entities.TensorValue
+    use entities.TensorInstance
+    use entities.ComputationNode
+    use entities.State
+    use utils.Utils
+    use utils.GraphUtils
+    use add.OPAddGraph
+    use matmul.OPMatmulGraph
+    use sigmoid.OPSigmoidGraph
+    use sgraph.Graph
+    use sgraph.ExecutionFunctions
+    use sgraph.ExecutionProperties
+    use sgraph.GraphExecution
+    use lemmas.UtilsLemmas
+
+    predicate init_graph (g: graph) =
+    let tis = g.gis ++ g.gos ++ g.its in
+    forall ti: tensor_instance. Mem.mem ti tis -> (is_some (g.state ti) <-> Mem.mem ti g.gis)  
+
+    predicate has_executed (c: computation_node) (g: graph) =
+    let outputs = Utils.get_tensors c.out g.state in
+    Mem.mem c g.cns /\
+    forall t: tensor_value. Mem.mem t outputs -> is_some t
+
+    (*Auxiliary invariant*)
+    predicate aux_inv (g: graph) =
+    forall c: computation_node. has_executed c g -> (computed (Utils.get_tensors c.inp g.state))
+
+    let lemma init_implies_unexec (c: computation_node) (g: graph)
+    requires { Mem.mem c g.cns }
+    requires { init_graph g }
+    ensures { not (has_executed c g) }
+    =
+    (*
+    assert { forall ti: tensor_instance. Mem.mem ti c.out -> (Mem.mem ti g.gos \/ Mem.mem ti g.its) };
+    assert { forall ti: tensor_instance. Mem.mem ti g.gos -> is_none (g.state ti) };
+    assert { forall ti: tensor_instance. Mem.mem ti g.its -> is_none (g.state ti) };
+    *)
+    assert { exists ti: tensor_instance. Mem.mem ti c.out };
+    (* uncomputed_get_tensors c.out g.state; *)
+    ()
+
+    let lemma aux_inv_preservation (c: computation_node) (g: graph)
+    requires { is_executable c g }
+    ensures { aux_inv g -> aux_inv (execute c g) }
+    =
+    let g' = execute c g in
+    let inputs = Utils.get_tensors c.inp g.state in
+    let op_outputs = op_exec c inputs in
+    let new_state = g'.state in
+    assert { Utils.get_tensors c.out new_state = op_outputs };
+    assert { forall c': computation_node. (Mem.mem c' g'.cns /\ c' <> c) -> has_executed c' g' -> has_executed c' g };
+    (*
+    assert { forall ti: tensor_instance. Mem.mem ti c.out -> is_none (g.state ti) };
+    *)
+    assert { forall c': computation_node. (Mem.mem c' g'.cns) ->
+            computed (Utils.get_tensors c'.inp g.state) -> computed (Utils.get_tensors c'.inp g'.state) };
+    ()
+end
+
+module MainInvariant
+    use int.Int
+    use list.Mem
+    use list.List
+    use list.Length
+    use list.Append
+    use entities.TensorValue
+    use entities.TensorInstance
+    use entities.ComputationNode
+    use entities.State
+    use utils.Utils
+    use utils.GraphUtils
+    use add.OPAddGraph
+    use matmul.OPMatmulGraph
+    use sigmoid.OPSigmoidGraph
+    use sgraph.Graph
+    use sgraph.ExecutionFunctions
+    use sgraph.ExecutionProperties
+    use sgraph.GraphExecution
+    use AuxInvariant
+
+    (* Main Invariant *)
+    predicate inv (g: graph) =
+    forall c, c': computation_node. 
+            (Mem.mem c g.cns /\ Mem.mem c' g.cns /\ is_executable c g /\
+            (exists l: list vertex. path (C c') l (C c) g.gis g.gos g.cns /\ l <> Nil)) ->
+                    has_executed c' g
+
+    (*
+    let lemma init_executability_aux (g: graph) (c c': computation_node)
+    requires { Mem.mem c g.cns }
+    requires { Mem.mem c' g.cns }
+    requires { init_graph g }
+    requires { is_executable c g }
+    ensures { not (edge (C c') (C c) g.gis g.gos g.cns) }
+    =
+    assert { edge (C c') (C c) g.gis g.gos g.cns ->
+        exists ti: tensor_instance. Mem.mem ti c'.out /\ Mem.mem ti c.inp };
+    assert { forall ti: tensor_instance. Mem.mem ti c.inp -> is_some (g.state ti) };
+    assert { forall ti: tensor_instance. Mem.mem ti c'.out -> is_none (g.state ti) };
+    ()
+    *)
+
+    let rec lemma init_no_preds (g: graph) (c c': computation_node) (l: list vertex)
+    requires { Mem.mem c g.cns }
+    requires { Mem.mem c' g.cns }
+    requires { init_graph g }
+    requires { is_executable c g }
+    requires { l <> Nil }
+    ensures { not (path (C c') l (C c) g.gis g.gos g.cns) }
+    variant { l }
+    =
+    match l with
+    | Cons h Nil ->
+        assert { not (edge (C c') (C c) g.gis g.gos g.cns) };
+        ()
+    | Cons h t ->
+        let next_elem = match t with | Cons hh tt -> hh end in
+        match next_elem with
+        | C c'' ->
+            if path (C c') (Cons h t) (C c) g.gis g.gos g.cns then begin
+                (*
+                assert { edge (C c') next_elem g.gis g.gos g.cns };
+                assert { Mem.mem c'' g.cns };
+                *)
+                init_no_preds g c c'' t;
+            end
+            else ()
+        | T tn -> ()
+        end
+    end
+
+    (*
+    let rec lemma inv_preservation (c next pred: computation_node) (g: graph) (l: list vertex)
+    requires { is_executable c g }
+    requires { is_executable next (execute c g) }
+    requires { Mem.mem pred (execute c g).cns }
+    requires { l <> Nil }
+    requires { path (C pred) l (C next) (execute c g).gis (execute c g).gos (execute c g).cns }
+    requires { aux_inv g }
+    ensures { has_executed pred (execute c g) }
+    variant { l }
+    =
+    match l with
+    | Cons h Nil ->
+        assert { edge (C pred) (C next) (execute c g).gis (execute c g).gos (execute c g).cns };
+        assert { exists ti: tensor_instance. Mem.mem ti pred.out /\ Mem.mem ti next.inp };
+        assert { forall ti: tensor_instance. Mem.mem ti next.inp -> is_some ((execute c g).state ti) };
+        assert { forall ti: tensor_instance. Mem.mem ti pred.out -> is_some ((execute c g).state ti) };
+        ()
+    | Cons h t ->
+        let next_elem = match t with | Cons hh tt -> hh end in
+        match next_elem with
+        | C next_pred ->
+            inv_preservation c next next_pred g t;
+            assert { has_executed next_pred (execute c g) };
+            assert { forall ti: tensor_instance. Mem.mem ti next_pred.inp -> is_some ((execute c g).state ti) };
+            assert { edge (C pred) (C next_pred) (execute c g).gis (execute c g).gos (execute c g).cns };
+            assert { exists ti: tensor_instance. Mem.mem ti pred.out /\ is_some ((execute c g).state ti) };
+            assert { forall ti: tensor_instance. Mem.mem ti pred.out -> is_some ((execute c g).state ti) };
+        end
+    end
+    *)
+    let rec lemma inv_preservation (c pred: computation_node) (g: graph) (l: list vertex)
+	requires { is_executable c g }
+	requires { Mem.mem pred g.cns }
+	requires { l <> Nil }
+	requires { path (C pred) l (C c) g.gis g.gos g.cns }
+	requires { aux_inv g }
+	ensures { has_executed pred g }
+	variant { l }
+	=
+	match l with
+	| Cons h Nil ->
+	   assert { edge (C pred) (C c) g.gis g.gos g.cns };
+	   assert { exists ti: tensor_instance. Mem.mem ti pred.out /\ Mem.mem ti c.inp };
+	   assert { forall ti: tensor_instance. Mem.mem ti c.inp -> is_some (g.state ti) };
+	   assert { forall ti: tensor_instance. Mem.mem ti pred.out -> is_some (g.state ti) };
+	   ()
+	| Cons h t ->
+	   match t with
+	   | Cons next_elem _ ->
+	      match next_elem with 
+	      | C next_pred ->
+	        inv_preservation c next_pred g t;
+	        assert { has_executed next_pred g };
+	        assert { forall ti: tensor_instance. Mem.mem ti next_pred.inp -> is_some (g.state ti) };
+	        assert { edge (C pred) (C next_pred) g.gis g.gos g.cns };
+	        assert { exists ti: tensor_instance. Mem.mem ti pred.out /\ is_some (g.state ti) };
+	        assert { forall ti: tensor_instance. Mem.mem ti pred.out -> is_some (g.state ti) };
+	      end
+	   end
+	end
+
+end
+
+module InductiveInvariants
+    use int.Int
+    use list.Mem
+    use list.List
+    use list.Length
+    use list.Append
+    use entities.TensorValue
+    use entities.TensorInstance
+    use entities.ComputationNode
+    use entities.State
+    use utils.Utils
+    use utils.GraphUtils
+    use add.OPAddGraph
+    use matmul.OPMatmulGraph
+    use sigmoid.OPSigmoidGraph
+    use sgraph.Graph
+    use sgraph.ExecutionFunctions
+    use sgraph.ExecutionProperties
+    use sgraph.GraphExecution
+    use AuxInvariant
+    use MainInvariant
+
+    (* Auxiliary Invariant*)
+    let ghost predicate initGraph (g: graph)
+    ensures { result -> aux_inv g }
+    ensures { result -> inv g }
+    =
+    init_graph g
+
+    lemma aux_inv_manySteps :
+        forall g g' :graph. forall n:int. steps g g' n -> aux_inv g -> aux_inv g'
+
+    predicate aux_reachable (g: graph) =
+        exists g0 :graph, n:int. initGraph g0 /\ steps g0 g n
+
+    lemma aux_inv_reachable :
+        forall g : graph. aux_reachable g -> aux_inv g
+
+    (* Main Invariant *)
+    lemma inv_manySteps :
+        forall g g' :graph, n:int. steps g g' n -> (aux_inv g /\ inv g) -> inv g'
+
+    predicate reachable (g: graph) =
+        exists g0 :graph, n:int. (initGraph g0) /\ steps g0 g n
+
+    lemma inv_reachable :
+        forall g : graph. reachable g -> inv g
+end

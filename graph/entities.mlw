@@ -1,0 +1,85 @@
+module WrapperTensor
+    use tensor.Tensor
+
+    type tensor_int = tensor int
+    type tensor_real = tensor real
+
+    type wrapper_tensor = I tensor_int | R tensor_real
+
+end
+
+module TensorValue
+    use list.List
+    use option.Option
+    use WrapperTensor
+
+    type tensor_value = option wrapper_tensor
+
+    predicate is_some (t: tensor_value) =
+    match t with
+    | Some _ -> true
+    | None -> false
+    end
+
+    predicate is_none (t: tensor_value) = not (is_some t)
+
+    predicate not_computed (ts: list tensor_value) =
+    match ts with
+    | Nil -> true
+    | Cons h t -> is_none h /\ not_computed t
+    end
+
+    predicate computed (ts: list tensor_value) =
+    match ts with
+    | Nil -> true
+    | Cons h t -> is_some h /\ computed t
+    end
+end
+
+module TensorInstance
+    use int.Int
+
+    type tensor_instance = int
+end
+
+module State
+    use map.Map
+    use TensorInstance
+    use TensorValue
+
+    type state = map tensor_instance tensor_value
+end
+
+module Operator
+    use int.Int
+
+    type operator = | Add | Matmul | Sigmoid
+
+    function n_inputs (op: operator) : int =
+    match op with
+    | Add -> 2 | Matmul -> 2 | Sigmoid -> 1
+    end
+
+    function n_outputs (op: operator) : int =
+    match op with
+    | Add -> 1 | Matmul -> 1 | Sigmoid -> 1
+    end
+end
+
+module ComputationNode
+    use int.Int
+    use TensorInstance
+    use Operator
+    use list.List
+    use list.Length
+
+    type computation_node = {
+        id: int;
+        inp: list tensor_instance;
+        out: list tensor_instance;
+        op : operator;
+    }
+    invariant { length inp = n_inputs op /\ length out = n_outputs op }
+    by 
+    { id = 0; inp = (Cons 0 (Cons 1 Nil)); out = Cons 2 Nil; op = Add }
+end

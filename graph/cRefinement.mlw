@@ -1,0 +1,394 @@
+module Refinement
+    use int.Int
+    use map.Map
+    use option.Option
+    use list.List
+    use list.Length
+    use list.Append
+    use list.NumOcc
+    use mach.c.C
+    use mach.int.Int32
+    use array.Array
+    use libtensor.CTensor
+    use libvector.CIndex
+    use tensor.Tensor
+    use std.Clib
+    use entities.WrapperTensor
+    use entities.TensorValue
+    use entities.State
+    use entities.TensorInstance
+    use entities.Operator
+    use entities.ComputationNode
+    use utils.Utils
+    use utils.GraphUtils
+    use sgraph.Graph
+    use centities.CEntities
+    use cGraph.CGraph
+    use memory.Ccomputation_node
+
+    predicate valid_cstate (s: cstate) =
+    0 <= Int32.to_int s.num_values /\                       (* nonnegative number of entries *)
+    valid_range s.values 0 (Int32.to_int s.num_values) /\   (* valid storage for those entries *)
+    forall i: int. 0 <= i < Int32.to_int s.num_values ->    (* valid concrete tensor in every computed entry *)
+    (let ctensor_i = value_at s.values i in                 (* only computed tensors are meaningful *)
+    ctensor_i.computed -> CTensor.valid_tensor ctensor_i.value)
+    (*
+    (let ctensor_i = s.values [i] in                        (* only computed tensors are meaningful *)
+    ctensor_i.computed -> CTensor.valid_tensor ctensor_i.value)
+    *)
+
+    function ref_tensor_single (ctg: ctensor_value) : tensor_value 
+    =
+    if ctg.computed then Some (R (CTensor.ref_tensor ctg.value)) else None
+
+    let ghost function ref_state (s: cstate) : state
+    requires { valid_cstate s }
+    =
+    pure { 
+    fun i ->
+        (* let entry = s.values[i] in *)
+        let entry = value_at s.values i in
+        if (0 <= i < Int32.to_int s.num_values) then (ref_tensor_single entry)
+        else None 
+    }
+    
+    predicate is_gi (tn: tensor_instance) (cns: list computation_node)
+    =
+    Mem.mem tn (cn_get_inps cns) /\ not (Mem.mem tn (cn_get_outs cns))
+
+    predicate is_go (tn: tensor_instance) (cns: list computation_node)
+    =
+    Mem.mem tn (cn_get_outs cns) /\ not (Mem.mem tn (cn_get_inps cns))
+
+    predicate is_it (tn: tensor_instance) (cns: list computation_node)
+    =
+    Mem.mem tn (cn_get_inps cns) /\ Mem.mem tn (cn_get_outs cns)
+
+    function ref_gis (cns: list computation_node) (tns: list tensor_instance) : list tensor_instance 
+    =
+    match tns with
+        | Nil -> Nil
+        | Cons h t ->
+            let gis = ref_gis cns t in
+            if is_gi h cns /\ not (Mem.mem h gis)
+            then Cons h gis
+            else gis
+    end
+
+    function ref_gos (cns: list computation_node) (tns: list tensor_instance) : list tensor_instance =
+    match tns with
+        | Nil -> Nil
+        | Cons h t -> 
+            if is_go h cns then Cons h (ref_gos cns t)
+            else ref_gos cns t
+    end
+
+    function ref_its (cns: list computation_node) (tns: list tensor_instance) : list tensor_instance =
+    match tns with
+        | Nil -> Nil
+        | Cons h t -> 
+            if is_it h cns
+            then Cons h (ref_its cns t)
+            else ref_its cns t
+    end
+
+    predicate valid_cn (cn: ccomputation_node)
+    =
+    0 <= Int32.to_int cn.num_inputs /\
+    0 <= Int32.to_int cn.num_outputs /\
+    Length.length (ivector cn.inputs (to_int cn.num_inputs)) = n_inputs cn.op  /\
+    Length.length (ivector cn.outputs (to_int cn.num_outputs)) = n_outputs cn.op /\
+    valid_range cn.inputs 0 (to_int cn.num_inputs) /\
+    valid_range cn.outputs 0 (to_int cn.num_outputs)
+
+    let ghost function ref_computation_node (cn: ccomputation_node) (id: int) : computation_node
+    requires { valid_cn cn }
+    =
+    { 
+        ComputationNode.id = id; 
+        ComputationNode.op = cn.op; 
+        ComputationNode.inp = ivector cn.inputs (to_int cn.num_inputs); 
+        ComputationNode.out = ivector cn.outputs (to_int cn.num_outputs) 
+    }
+
+    let rec ghost function ref_cns_from (cns: list ccomputation_node) (id: int) : list computation_node
+    requires { forall cn: ccomputation_node. Mem.mem cn cns -> valid_cn cn }
+    variant { cns }
+    =
+    match cns with
+        | Nil -> Nil
+        | Cons h t -> Cons (ref_computation_node h id) (ref_cns_from t (id + 1))
+    end
+
+    let rec ghost function ref_cns (cns: list ccomputation_node) : list computation_node
+    requires { forall cn: ccomputation_node. Mem.mem cn cns -> valid_cn cn }
+    ensures { result = ref_cns_from cns 0 }
+    variant { cns }
+    =
+    ref_cns_from cns 0
+
+    let rec lemma slice_cn_valid (p: ptr ccomputation_node) (lo hi: int)
+    requires { forall i: int. lo <= i < hi -> valid_cn (value_at_cn p i) }
+    ensures { forall c: ccomputation_node. Mem.mem c (slice_cn p lo hi) -> valid_cn c }
+    variant { hi - lo }
+    =
+    if lo < hi then
+        slice_cn_valid p (lo + 1) hi
+
+    let rec lemma slice_cn_build_mem (u: ptr ccomputation_node) (p q i: int)
+    requires { p <= i /\ i < q }
+    requires { forall j: int. p <= j < q -> valid_cn (value_at_cn u j) }
+    ensures { Mem.mem (ref_computation_node (value_at_cn u i) i) (ref_cns_from (slice_cn u p q) p) }
+    variant { i - p }
+    =
+    if p = i then 
+        begin
+            assert { slice_cn u p q = Cons (value_at_cn u p) (slice_cn u (p + 1) q) };
+            assert { ref_cns_from (slice_cn u p q) p = Cons (ref_computation_node (value_at_cn u p) p) (ref_cns_from (slice_cn u (p + 1) q) (p + 1)) }
+        end 
+    else
+        begin
+        slice_cn_build_mem u (p + 1) q i;
+        assert { slice_cn u p q = Cons (value_at_cn u p) (slice_cn u (p + 1) q) };
+        assert { ref_cns_from (slice_cn u p q) p = Cons (ref_computation_node (value_at_cn u p) p) (ref_cns_from (slice_cn u (p + 1) q) (p + 1)) }
+    end
+    
+    (*!Todo: Find a betterv placement for this *)
+    (** Proving tensor uniqueness by construction **)
+    (** 1. Tensor Taxonomy and disjointness across categories **)
+    let rec lemma ref_gis_mem (cns: list computation_node) (tns: list tensor_instance)
+    ensures { forall ti:tensor_instance. Mem.mem ti (ref_gis cns tns) -> is_gi ti cns }
+    ensures { forall ti:tensor_instance. (Mem.mem ti tns /\ is_gi ti cns) <-> Mem.mem ti (ref_gis cns tns) }
+    variant { Length.length tns }
+    =
+    match tns with
+    | Nil -> ()
+    | Cons _ t -> ref_gis_mem cns t
+    end
+    
+    let rec lemma ref_gos_mem (cns: list computation_node) (tns: list tensor_instance)
+    ensures { forall ti:tensor_instance. Mem.mem ti (ref_gos cns tns) -> is_go ti cns }
+    ensures { forall ti:tensor_instance. (Mem.mem ti tns /\ is_go ti cns) <-> Mem.mem ti (ref_gos cns tns) }
+    variant { Length.length tns }
+    =
+    match tns with
+    | Nil -> ()
+    | Cons _ t -> ref_gos_mem cns t
+    end
+
+    let rec lemma ref_its_mem (cns: list computation_node) (tns: list tensor_instance)
+    ensures { forall ti:tensor_instance. Mem.mem ti (ref_its cns tns) -> is_it ti cns }
+    ensures { forall ti:tensor_instance. (Mem.mem ti tns /\ is_it ti cns) <-> Mem.mem ti (ref_its cns tns) }
+    variant { Length.length tns }
+    =
+    match tns with
+    | Nil -> ()
+    | Cons _ t -> ref_its_mem cns t
+    end
+
+    (** 2. Uniqueness within graph inputs **)
+    let rec lemma ref_gis_unique (cns: list computation_node) (tns: list tensor_instance)
+    ensures { forall ti:tensor_instance. Mem.mem ti (ref_gis cns tns) -> NumOcc.num_occ ti (ref_gis cns tns) = 1 }
+    variant { Length.length tns }
+    =
+    match tns with
+    | Nil -> ()
+    | Cons _ t -> 
+        ref_gis_unique cns t;
+    end
+
+
+    (** 3. Uniqueness within graph outputs and intermediate tensors **)
+    let lemma unique_tail (h: 'a) (t: list 'a)
+    requires { forall x:'a. Mem.mem x (Cons h t) -> NumOcc.num_occ x (Cons h t) = 1 }
+    ensures { forall x:'a. Mem.mem x t -> NumOcc.num_occ x t = 1 }
+    =
+    assert { forall x:'a. x <> h -> NumOcc.num_occ x (Cons h t) = NumOcc.num_occ x t }
+
+    let rec lemma ref_gos_unique (cns: list computation_node) (tns: list tensor_instance)
+    requires { forall ti:tensor_instance. Mem.mem ti tns -> NumOcc.num_occ ti tns = 1 }
+    ensures { forall ti:tensor_instance. Mem.mem ti (ref_gos cns tns) -> Mem.mem ti tns }
+    ensures { forall ti:tensor_instance. Mem.mem ti (ref_gos cns tns) -> NumOcc.num_occ ti (ref_gos cns tns) = 1 }
+    variant { Length.length tns }
+    =
+    match tns with
+    | Nil -> ()
+    | Cons _ t -> ref_gos_unique cns t
+    end
+
+    let rec lemma ref_its_unique (cns: list computation_node) (tns: list tensor_instance)
+    requires { forall ti:tensor_instance. Mem.mem ti tns -> NumOcc.num_occ ti tns = 1 }
+    ensures { forall ti:tensor_instance. Mem.mem ti (ref_its cns tns) -> Mem.mem ti tns }
+    ensures { forall ti:tensor_instance. Mem.mem ti (ref_its cns tns) -> NumOcc.num_occ ti (ref_its cns tns) = 1 }
+    variant { Length.length tns }
+    =
+    match tns with
+    | Nil -> ()
+    | Cons _ t -> ref_its_unique cns t
+    end
+    (** ----------------------------------------- **)
+    (** Proving computation node id uniqueness by construction **)
+    let rec lemma ref_cns_from_unique_ids (cns: list ccomputation_node) (id: int)
+    requires { forall c:ccomputation_node. Mem.mem c cns -> valid_cn c }
+    ensures { forall cid:int. Mem.mem cid (Utils.cn_get_ids (ref_cns_from cns id)) -> id <= cid }
+    ensures { forall cid:int. Mem.mem cid (Utils.cn_get_ids (ref_cns_from cns id)) -> NumOcc.num_occ cid (Utils.cn_get_ids (ref_cns_from cns id)) = 1 }
+    variant { Length.length cns }
+    =
+    match cns with
+    | Nil -> ()
+    | Cons _ t ->
+        ref_cns_from_unique_ids t (id + 1);
+        (* The first ensures proves this assert *)
+        (** Proof Guidance **)
+        (* Every identifier generated by the recursive call is >= id + 1 *)
+        assert { not Mem.mem id (Utils.cn_get_ids (ref_cns_from t (id + 1))) }
+        (* This assert proves the second ensures *)
+        (** Proof Guidance **)
+        (* From the requirements: valid h id -> (ref_computation_node h id).id = id *)
+        (* From the assert: Establishing that the id never occurs on the recursive call *)
+    end
+    (** ------------------------------------------------------ **)
+
+    (** Proving Input Closure by construction **)
+    (* 1. Graph Inputs          --> 2nd ensures clause in ref_gis_mem *)
+    (* 2. Intermediate Tensors  --> 2nd ensures clause in ref_its_mem *)
+    (* Together we have: 
+        - tns = inTids; ref_gis cns tns = gis
+        a) forall ti:tensor_instance. (Mem.mem ti inTids /\ is_gi ti cns) <-> Mem.mem ti gis
+        - tns = outTids; ref_its cns tns = its
+        b) forall ti:tensor_instance. (Mem.mem ti outTids /\ is_it ti cns) <-> Mem.mem ti its
+        Combining them:
+        c) forall ti:tensor_instance. (Mem.mem ti inTids /\ is_gi ti cns) \/ (Mem.mem ti outTids /\ is_it ti cns) 
+                                    <-> 
+                                      (Mem.mem ti gis \/ Mem.mem ti its)
+        Replacing is_it and is_gi by the respective definitions:
+        d) forall ti:tensor_instance. (Mem.mem ti inTids /\ (Mem.mem ti inTids /\ not (Mem.mem ti outTids)) \/ (Mem.mem ti outTids /\ ((Mem.mem ti inTids) /\ Mem.mem ti outTids)))
+                                    <-> 
+                                      (Mem.mem ti its \/ Mem.mem ti gis)
+        e) forall ti:tensor_instance. (Mem.mem ti inTids /\ not (Mem.mem ti outTids)) \/ (Mem.mem ti inTids /\ Mem.mem ti outTids)
+                                    <-> 
+                                      (Mem.mem ti its \/ Mem.mem ti gis)
+        f) forall ti:tensor_instance. Mem.mem ti inTids /\ (not (Mem.mem ti outTids) \/ Mem.mem ti outTids)
+                                    <-> 
+                                      (Mem.mem ti its \/ Mem.mem ti gis)
+        g) forall ti:tensor_instance. Mem.mem ti inTids <-> (Mem.mem ti its \/ Mem.mem ti gis)
+    *)
+    (** ------------------------------------- **)
+
+    (** Proving Output Closure by construction **)
+    (* 1. Graph Outputs         --> 2nd ensures clause in ref_gos_mem *)
+    (* 2. Intermediate Tensors  --> 2nd ensures clause in ref_its_mem *)
+    (* Together we have: 
+        - tns = outTids; ref_gos cns tns = gos
+        a) forall ti:tensor_instance. (Mem.mem ti outTids /\ is_go ti cns) <-> Mem.mem ti gos
+        - tns = outTids; ref_its cns tns = its
+        b) forall ti:tensor_instance. (Mem.mem ti outTids /\ is_it ti cns) <-> Mem.mem ti its
+        Combining them:
+        c) forall ti:tensor_instance. (Mem.mem ti outTids /\ (is_it ti cns \/ is_go ti cns)) <-> (Mem.mem ti its \/ Mem.mem ti gos)
+        Replacing is_it and is_go by the respective definitions:
+        d) forall ti:tensor_instance. (Mem.mem ti outTids /\ ((Mem.mem ti inTids /\ Mem.mem ti outTids) \/ ((not (Mem.mem ti inTids) /\ Mem.mem ti outTids)))) 
+                                    <-> 
+                                      (Mem.mem ti its \/ Mem.mem ti gos)
+        e) forall ti:tensor_instance. (Mem.mem ti outTids /\ ((Mem.mem ti inTids) \/ (not(Mem.mem ti inTids)))
+                                    <-> 
+                                      (Mem.mem ti its \/ Mem.mem ti gos)
+        e) forall ti:tensor_instance. Mem.mem ti outTids <-> (Mem.mem ti its \/ Mem.mem ti gos)
+    *)
+    (** ------------------------------------- **)
+
+    (** Proving Tensor Coverage by construction **)
+    (* We know that:
+        - forall ti: Mem.mem ti inTids <-> (Mem.mem ti gis \/ Mem.mem ti its)
+        - forall ti: Mem.mem ti outTids <-> (Mem.mem ti gos \/ Mem.mem ti its)
+        - tis = gis ++ gos ++ its 
+       Combining them:
+        - Mem.mem ti tis -> (Mem.mem ti gis \/ Mem.mem ti gos \/ Mem.mem ti its)
+        - Mem.mem ti tis -> (Mem.mem ti inTids \/ Mem.mem ti outTids)
+    *)
+    (** ------------------------------------- **)
+
+    (** Proving In tensor condition by construction **)
+    (* We know that:
+        - forall ti: Mem.mem ti inTids <-> (Mem.mem ti gis \/ Mem.mem ti its)
+        - forall ti: Mem.mem ti outTids <-> (Mem.mem ti gos \/ Mem.mem ti its)
+        - tis = gis ++ gos ++ its 
+       Combining them:
+        - Mem.mem ti tis <-> (Mem.mem ti gis \/ Mem.mem ti gos \/ Mem.mem ti its)
+        - Mem.mem ti tis <-> (Mem.mem ti inTids \/ Mem.mem ti outTids)
+    *)
+    (** ------------------------------------- **)
+
+    (** Proving Out tensor condition by construction **)
+    (* We know that:
+        - Input closure: forall ti:tensor_instance. Mem.mem ti inTids <-> (Mem.mem ti its \/ Mem.mem ti gis)
+        - Output closure: forall ti:tensor_instance. Mem.mem ti outTids <-> (Mem.mem ti its \/ Mem.mem ti gos)
+        - Tensor Coverage: Mem.mem ti tis <-> (Mem.mem ti inTids \/ Mem.mem ti outTids)
+    
+        Target:
+        forall ti: tensor_instance. Mem.mem ti tis -> (not (Mem.mem ti outTids) <-> Mem.mem ti gis)
+    *)
+    (** ------------------------------------- **)
+    predicate valid_cgraph (g: cgraph) =
+    let cns = ref_cns (vector_cn g.cns (to_int g.num_cns)) in
+    let inTids = cn_get_inps cns in
+    let outTids = cn_get_outs cns in
+    let gis = ref_gis cns inTids in
+    let gos = ref_gos cns outTids in
+    let its = ref_its cns outTids in
+    let tis = gis ++ gos ++ its in
+    0 <= Int32.to_int g.num_cns /\
+    valid_range g.cns 0 (Int32.to_int g.num_cns) /\
+    (forall i: int. 0 <= i < Int32.to_int g.num_cns -> valid_cn g.cns[i]) /\
+    valid_cstate g.state /\
+    (forall tn: tensor_instance. Mem.mem tn tis <-> 0 <= tn < to_int g.state.num_values)
+
+    predicate cgraph_constraints (g: cgraph) =
+    let cns = ref_cns (vector_cn g.cns (to_int g.num_cns)) in
+    let inTids = cn_get_inps cns in
+    let outTids = cn_get_outs cns in
+    let state = ref_state g.state in
+    let gis = ref_gis cns inTids in
+    let gos = ref_gos cns outTids in
+    (** Only constraints that are not captured by construction **)
+    (* 1. Unique producer *)
+    (forall ti: tensor_instance. Mem.mem ti outTids -> NumOcc.num_occ ti outTids = 1 ) /\
+    (* 2. Valued graph inputs *)
+    (forall ti:tensor_instance. Mem.mem ti gis -> is_some (state ti)) /\
+    (* 3. Atomic output production *)
+    (forall c: computation_node. Mem.mem c cns ->
+    (forall t: tensor_value. Mem.mem t (get_tensors c.out state) -> is_some t) 
+    \/ 
+    (forall t: tensor_value. Mem.mem t (get_tensors c.out state) -> is_none t)) /\
+    (* 4. Acyclcicity *)
+    (forall c: computation_node. Mem.mem c cns -> not (has_cycle c gis gos cns) ) /\
+    (* 5. Reachability *)
+    (forall c: computation_node. Mem.mem c cns -> (exists og: tensor_instance. (Mem.mem og gos) /\ (reachable (C c) og gis gos cns)) )
+
+    let ghost function ref_graph (g: cgraph) : Graph.graph
+    requires { valid_cgraph g }
+    requires { cgraph_constraints g }
+    ensures { let cns = ref_cns (vector_cn g.cns (to_int g.num_cns)) in 
+              let inTids = cn_get_inps cns in 
+              let outTids = cn_get_outs cns in
+              result.Graph.cns = cns /\
+              result.gis = ref_gis cns inTids /\
+              result.its = ref_its cns outTids /\  
+              result.gos = ref_gos cns outTids 
+    }
+    ensures { result.Graph.state = ref_state g.state }
+    =
+    let state = ref_state g.state in
+    let cns = ref_cns (vector_cn g.cns (to_int g.num_cns)) in
+    let inTids = cn_get_inps cns in
+    let outTids = cn_get_outs cns in
+    let gis = ref_gis cns inTids in
+    let gos = ref_gos cns outTids in
+    let its = ref_its cns outTids in
+    {
+        gis = gis;
+        gos = gos;
+        its = its;
+        Graph.cns = cns;
+        Graph.state = state;
+    }
+end

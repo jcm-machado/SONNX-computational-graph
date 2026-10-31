@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE why3session PUBLIC "-//Why3//proof session v5//EN"
+"https://www.why3.org/why3session.dtd">
+<why3session shape_version="6">
+<prover id="0" name="CVC5" version="1.2.1" timelimit="1" steplimit="0" memlimit="1000"/>
+<prover id="1" name="Alt-Ergo" version="2.4.3" timelimit="1" steplimit="0" memlimit="1000"/>
+<prover id="2" name="Z3" version="4.13.4" timelimit="1" steplimit="0" memlimit="1000"/>
+<file format="whyml" proved="true">
+<path name=".."/><path name="libtensor.mlw"/>
+<theory name="CTensor" proved="true">
+ <goal name="ref_tensor&#39;vc" expl="VC for ref_tensor" proved="true">
+ <proof prover="2"><result status="valid" time="0.048744" steps="211922"/></proof>
+ </goal>
+ <goal name="ref_tensorb&#39;vc" expl="VC for ref_tensorb" proved="true">
+ <proof prover="2"><result status="valid" time="0.038772" steps="212427"/></proof>
+ </goal>
+ <goal name="ctensor_create&#39;vc" expl="VC for ctensor_create" proved="true">
+ <proof prover="1"><result status="valid" time="0.021946" steps="416"/></proof>
+ </goal>
+ <goal name="ctensor_clear&#39;vc" expl="VC for ctensor_clear" proved="true">
+ <proof prover="1"><result status="valid" time="0.283677" steps="5804"/></proof>
+ </goal>
+ <goal name="ctensor_reset&#39;vc" expl="VC for ctensor_reset" proved="true">
+ <proof prover="1"><result status="valid" time="0.565271" steps="11650"/></proof>
+ </goal>
+ <goal name="ctensor_where&#39;vc" expl="VC for ctensor_where" proved="true">
+ <proof prover="0"><result status="timeout" time="1.000000"/></proof>
+ <proof prover="1"><result status="timeout" time="1.000000" steps="17528"/></proof>
+ <proof prover="2"><result status="timeout" time="1.000000" steps="3260431"/></proof>
+ <transf name="split_vc" proved="true" >
+  <goal name="ctensor_where&#39;vc.0" expl="precondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.190764" steps="744760"/></proof>
+  </goal>
+  <goal name="ctensor_where&#39;vc.1" expl="integer overflow" proved="true">
+  <proof prover="2"><result status="valid" time="0.021531" steps="156967"/></proof>
+  </goal>
+  <goal name="ctensor_where&#39;vc.2" expl="loop invariant init" proved="true">
+  <proof prover="2"><result status="valid" time="0.004689" steps="7579"/></proof>
+  </goal>
+  <goal name="ctensor_where&#39;vc.3" expl="precondition" proved="true">
+  <proof prover="1"><result status="valid" time="0.043158" steps="677"/></proof>
+  </goal>
+  <goal name="ctensor_where&#39;vc.4" expl="precondition" proved="true">
+  <proof prover="1"><result status="valid" time="0.043944" steps="714"/></proof>
+  </goal>
+  <goal name="ctensor_where&#39;vc.5" expl="precondition" proved="true">
+  <proof prover="1"><result status="valid" time="0.045033" steps="717"/></proof>
+  </goal>
+  <goal name="ctensor_where&#39;vc.6" expl="precondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.031294" steps="164907"/></proof>
+  </goal>
+  <goal name="ctensor_where&#39;vc.7" expl="precondition" proved="true">
+  <proof prover="1"><result status="valid" time="0.023449" steps="347"/></proof>
+  </goal>
+  <goal name="ctensor_where&#39;vc.8" expl="loop invariant preservation" proved="true">
+  <proof prover="1"><result status="valid" time="0.044811" steps="985"/></proof>
+  </goal>
+  <goal name="ctensor_where&#39;vc.9" expl="assertion" proved="true">
+  <proof prover="1"><result status="valid" time="0.310840" steps="5951"/></proof>
+  </goal>
+  <goal name="ctensor_where&#39;vc.10" expl="postcondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.041164" steps="199966"/></proof>
+  </goal>
+  <goal name="ctensor_where&#39;vc.11" expl="out of loop bounds" proved="true">
+  <proof prover="2"><result status="valid" time="0.037862" steps="164843"/></proof>
+  </goal>
+ </transf>
+ </goal>
+</theory>
+</file>
+</why3session>

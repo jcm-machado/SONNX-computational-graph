@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE why3session PUBLIC "-//Why3//proof session v5//EN"
+"https://www.why3.org/why3session.dtd">
+<why3session shape_version="6">
+<prover id="0" name="CVC5" version="1.2.1" timelimit="1" steplimit="0" memlimit="1000"/>
+<prover id="1" name="Alt-Ergo" version="2.4.3" timelimit="1" steplimit="0" memlimit="1000"/>
+<prover id="2" name="Z3" version="4.13.4" timelimit="1" steplimit="0" memlimit="1000"/>
+<file format="whyml" proved="true">
+<path name=".."/><path name="lemmas.mlw"/>
+<theory name="UtilsLemmas" proved="true">
+ <goal name="steps_nonneg&#39;vc" expl="VC for steps_nonneg" proved="true">
+ <transf name="induction_pr" proved="true" >
+  <goal name="steps_nonneg&#39;vc.0" expl="VC for steps_nonneg" proved="true">
+  <proof prover="2"><result status="valid" time="0.005209" steps="7126"/></proof>
+  </goal>
+  <goal name="steps_nonneg&#39;vc.1" expl="VC for steps_nonneg" proved="true">
+  <proof prover="2"><result status="valid" time="0.019141" steps="139591"/></proof>
+  </goal>
+ </transf>
+ </goal>
+ <goal name="uncomputed_get_tensors&#39;vc" expl="VC for uncomputed_get_tensors" proved="true">
+ <proof prover="1"><result status="valid" time="0.037282" steps="1081"/></proof>
+ </goal>
+ <goal name="computed_get_tensors&#39;vc" expl="VC for computed_get_tensors" proved="true">
+ <proof prover="1"><result status="valid" time="0.059313" steps="2774"/></proof>
+ </goal>
+ <goal name="computed_tensors&#39;vc" expl="VC for computed_tensors" proved="true">
+ <proof prover="1"><result status="valid" time="0.033811" steps="978"/></proof>
+ </goal>
+</theory>
+<theory name="Refinement" proved="true">
+ <goal name="step_preserves_executability&#39;vc" expl="VC for step_preserves_executability" proved="true">
+ <proof prover="0"><result status="timeout" time="1.000000"/></proof>
+ <proof prover="1"><result status="timeout" time="1.000000" steps="39069"/></proof>
+ <proof prover="2"><result status="timeout" time="1.000000" steps="3451703"/></proof>
+ <transf name="split_vc" proved="true" >
+  <goal name="step_preserves_executability&#39;vc.0" expl="assertion" proved="true">
+  <proof prover="0" timelimit="30" memlimit="4000"><result status="timeout" time="23.458645"/></proof>
+  <proof prover="1" timelimit="30" memlimit="4000"><result status="timeout" time="30.000000" steps="272102"/></proof>
+  <proof prover="2" timelimit="30" memlimit="4000"><result status="timeout" time="12.781505" steps="18010366"/></proof>
+  <transf name="compute_in_goal" proved="true" >
+   <goal name="step_preserves_executability&#39;vc.0.0" expl="assertion" proved="true">
+   <proof prover="0"><result status="timeout" time="1.000000"/></proof>
+   <proof prover="1"><result status="timeout" time="1.000000" steps="38658"/></proof>
+   <proof prover="2"><result status="timeout" time="1.000000" steps="4927676"/></proof>
+   <transf name="split_vc" proved="true" >
+    <goal name="step_preserves_executability&#39;vc.0.0.0" expl="assertion" proved="true">
+    <proof prover="0" timelimit="5" memlimit="2000"><result status="valid" time="4.765607" steps="344684"/></proof>
+    </goal>
+   </transf>
+   </goal>
+  </transf>
+  </goal>
+  <goal name="step_preserves_executability&#39;vc.1" expl="assertion" proved="true">
+  <proof prover="0" timelimit="30" memlimit="4000"><result status="timeout" time="23.642408"/></proof>
+  <proof prover="1" timelimit="30" memlimit="4000"><result status="timeout" time="30.000000" steps="431243"/></proof>
+  <proof prover="2" timelimit="30" memlimit="4000"><result status="timeout" time="12.379071" steps="17311481"/></proof>
+  <transf name="compute_in_goal" proved="true" >
+   <goal name="step_preserves_executability&#39;vc.1.0" expl="assertion" proved="true">
+   <proof prover="0"><result status="timeout" time="1.000000"/></proof>
+   <proof prover="1"><result status="timeout" time="1.000000" steps="39581"/></proof>
+   <proof prover="2"><result status="timeout" time="1.000000" steps="4598328"/></proof>
+   <transf name="split_vc" proved="true" >
+    <goal name="step_preserves_executability&#39;vc.1.0.0" expl="assertion" proved="true">
+    <proof prover="0" timelimit="5" memlimit="2000"><result status="valid" time="3.714624" steps="266210"/></proof>
+    </goal>
+   </transf>
+   </goal>
+  </transf>
+  </goal>
+  <goal name="step_preserves_executability&#39;vc.2" expl="postcondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.024272" steps="171906"/></proof>
+  </goal>
+ </transf>
+ </goal>
+ <goal name="execute_commute&#39;vc" expl="VC for execute_commute" proved="true">
+ <proof prover="0"><result status="timeout" time="1.000000"/></proof>
+ <proof prover="1"><result status="timeout" time="1.000000" steps="23311"/></proof>
+ <proof prover="2"><result status="timeout" time="1.000000" steps="3559511"/></proof>
+ <transf name="split_vc" proved="true" >
+  <goal name="execute_commute&#39;vc.0" expl="precondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.017817" steps="144851"/></proof>
+  </goal>
+  <goal name="execute_commute&#39;vc.1" expl="precondition" proved="true">
+  <proof prover="0" timelimit="5" memlimit="2000"><result status="timeout" time="3.355461"/></proof>
+  <proof prover="1" timelimit="5" memlimit="2000"><result status="timeout" time="5.000000" steps="86832"/></proof>
+  <proof prover="2" timelimit="5" memlimit="2000"><result status="timeout" time="3.139965" steps="6079835"/></proof>
+  <transf name="inline_goal" proved="true" >
+   <goal name="execute_commute&#39;vc.1.0" expl="precondition" proved="true">
+   <transf name="split_all_full" proved="true" >
+    <goal name="execute_commute&#39;vc.1.0.0" expl="precondition" proved="true">
+    <proof prover="0" timelimit="30" memlimit="4000"><result status="timeout" time="23.743313"/></proof>
+    <proof prover="1" timelimit="30" memlimit="4000"><result status="timeout" time="30.000000" steps="363534"/></proof>
+    <proof prover="2" timelimit="30" memlimit="4000"><result status="timeout" time="20.804581" steps="17557914"/></proof>
+    <transf name="compute_in_goal" proved="true" >
+     <goal name="execute_commute&#39;vc.1.0.0.0" expl="precondition" proved="true">
+     <proof prover="0"><result status="valid" time="0.269043" steps="74320"/></proof>
+     </goal>
+    </transf>
+    </goal>
+   </transf>
+   </goal>
+  </transf>
+  </goal>
+  <goal name="execute_commute&#39;vc.2" expl="precondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.018966" steps="152010"/></proof>
+  </goal>
+  <goal name="execute_commute&#39;vc.3" expl="precondition" proved="true">
+  <proof prover="0" timelimit="5" memlimit="2000"><result status="timeout" time="3.374678"/></proof>
+  <proof prover="1" timelimit="5" memlimit="2000"><result status="timeout" time="5.000000" steps="92566"/></proof>
+  <proof prover="2" timelimit="5" memlimit="2000"><result status="timeout" time="2.952135" steps="6595417"/></proof>
+  <transf name="inline_goal" proved="true" >
+   <goal name="execute_commute&#39;vc.3.0" expl="precondition" proved="true">
+   <transf name="split_all_full" proved="true" >
+    <goal name="execute_commute&#39;vc.3.0.0" expl="precondition" proved="true">
+    <proof prover="0" timelimit="30" memlimit="4000"><result status="timeout" time="24.025777"/></proof>
+    <proof prover="1" timelimit="30" memlimit="4000"><result status="timeout" time="30.000000" steps="368670"/></proof>
+    <proof prover="2" timelimit="30" memlimit="4000"><result status="timeout" time="21.338043" steps="15735546"/></proof>
+    <transf name="compute_in_goal" proved="true" >
+     <goal name="execute_commute&#39;vc.3.0.0.0" expl="precondition" proved="true">
+     <proof prover="0"><result status="valid" time="0.335700" steps="83283"/></proof>
+     </goal>
+    </transf>
+    </goal>
+   </transf>
+   </goal>
+  </transf>
+  </goal>
+  <goal name="execute_commute&#39;vc.4" expl="assertion" proved="true">
+  <proof prover="2"><result status="valid" time="0.022309" steps="158545"/></proof>
+  </goal>
+  <goal name="execute_commute&#39;vc.5" expl="assertion" proved="true">
+  <proof prover="2"><result status="valid" time="0.023433" steps="160438"/></proof>
+  </goal>
+  <goal name="execute_commute&#39;vc.6" expl="assertion" proved="true">
+  <proof prover="0" timelimit="30" memlimit="4000"><result status="timeout" time="26.207886"/></proof>
+  <proof prover="1" timelimit="30" memlimit="4000"><result status="timeout" time="30.000000" steps="418464"/></proof>
+  <proof prover="2" timelimit="30" memlimit="4000"><result status="timeout" time="15.868913" steps="46860857"/></proof>
+  <transf name="compute_in_goal" proved="true" >
+   <goal name="execute_commute&#39;vc.6.0" expl="assertion" proved="true">
+   <proof prover="0"><result status="timeout" time="1.000000"/></proof>
+   <proof prover="1"><result status="timeout" time="1.000000" steps="45982"/></proof>
+   <proof prover="2"><result status="timeout" time="1.000000" steps="5612330"/></proof>
+   <transf name="split_vc" proved="true" >
+    <goal name="execute_commute&#39;vc.6.0.0" expl="assertion" proved="true">
+    <proof prover="0" timelimit="5" memlimit="2000"><result status="valid" time="1.538211" steps="210785"/></proof>
+    </goal>
+   </transf>
+   </goal>
+  </transf>
+  </goal>
+  <goal name="execute_commute&#39;vc.7" expl="assertion" proved="true">
+  <proof prover="0" timelimit="30" memlimit="4000"><result status="timeout" time="14.002599"/></proof>
+  <proof prover="1" timelimit="30" memlimit="4000"><result status="timeout" time="30.000000" steps="350086"/></proof>
+  <proof prover="2" timelimit="30" memlimit="4000"><result status="timeout" time="9.997066" steps="23349715"/></proof>
+  <transf name="compute_in_goal" proved="true" >
+   <goal name="execute_commute&#39;vc.7.0" expl="assertion" proved="true">
+   <proof prover="0"><result status="valid" time="0.707178" steps="172043"/></proof>
+   </goal>
+  </transf>
+  </goal>
+  <goal name="execute_commute&#39;vc.8" expl="assertion" proved="true">
+  <proof prover="0" timelimit="30" memlimit="4000"><result status="timeout" time="13.690543"/></proof>
+  <proof prover="1" timelimit="30" memlimit="4000"><result status="timeout" time="30.000000" steps="202692"/></proof>
+  <proof prover="2" timelimit="30" memlimit="4000"><result status="timeout" time="11.566466" steps="25951955"/></proof>
+  <transf name="compute_in_goal" proved="true" >
+   <goal name="execute_commute&#39;vc.8.0" expl="assertion" proved="true">
+   <proof prover="0"><result status="timeout" time="1.000000"/></proof>
+   <proof prover="1"><result status="timeout" time="1.000000" steps="51261"/></proof>
+   <proof prover="2"><result status="timeout" time="1.000000" steps="5719137"/></proof>
+   <transf name="split_vc" proved="true" >
+    <goal name="execute_commute&#39;vc.8.0.0" expl="assertion" proved="true">
+    <proof prover="0" timelimit="5" memlimit="2000"><result status="valid" time="1.911057" steps="252899"/></proof>
+    </goal>
+   </transf>
+   </goal>
+  </transf>
+  </goal>
+  <goal name="execute_commute&#39;vc.9" expl="postcondition" proved="true">
+  <proof prover="2" timelimit="5" memlimit="2000"><result status="valid" time="3.597149" steps="9896350"/></proof>
+  </goal>
+ </transf>
+ </goal>
+ <goal name="stepind_preservation&#39;vc" expl="VC for stepind_preservation" proved="true">
+ <proof prover="2"><result status="valid" time="0.028541" steps="160336"/></proof>
+ </goal>
+ <goal name="steps_preservation&#39;vc" expl="VC for steps_preservation" proved="true">
+ <transf name="induction_pr" proved="true" >
+  <goal name="steps_preservation&#39;vc.0" expl="VC for steps_preservation" proved="true">
+  <proof prover="2"><result status="valid" time="0.008617" steps="10953"/></proof>
+  </goal>
+  <goal name="steps_preservation&#39;vc.1" expl="VC for steps_preservation" proved="true">
+  <proof prover="2"><result status="valid" time="0.025644" steps="157138"/></proof>
+  </goal>
+ </transf>
+ </goal>
+ <goal name="trans_left&#39;vc" expl="VC for trans_left" proved="true">
+ <proof prover="1"><result status="valid" time="0.051739" steps="1746"/></proof>
+ </goal>
+ <goal name="left_unfold&#39;vc" expl="VC for left_unfold" proved="true">
+ <proof prover="1"><result status="valid" time="0.830498" steps="23212"/></proof>
+ </goal>
+ <goal name="transitivity&#39;vc" expl="VC for transitivity" proved="true">
+ <transf name="induction_pr" proved="true" >
+  <goal name="transitivity&#39;vc.0" expl="VC for transitivity" proved="true">
+  <proof prover="2"><result status="valid" time="0.007925" steps="10851"/></proof>
+  </goal>
+  <goal name="transitivity&#39;vc.1" expl="VC for transitivity" proved="true">
+  <proof prover="1"><result status="valid" time="0.778818" steps="24833"/></proof>
+  </goal>
+ </transf>
+ </goal>
+ <goal name="diamond&#39;vc" expl="VC for diamond" proved="true">
+ <proof prover="0"><result status="valid" time="0.143135" steps="55161"/></proof>
+ </goal>
+ <goal name="strip&#39;vc" expl="VC for strip" proved="true">
+ <proof prover="0"><result status="timeout" time="1.000000"/></proof>
+ <proof prover="1"><result status="timeout" time="1.000000" steps="24187"/></proof>
+ <proof prover="2"><result status="timeout" time="1.000000" steps="5983064"/></proof>
+ <transf name="split_vc" proved="true" >
+  <goal name="strip&#39;vc.0" expl="variant decrease" proved="true">
+  <proof prover="2"><result status="valid" time="0.004985" steps="10863"/></proof>
+  </goal>
+  <goal name="strip&#39;vc.1" expl="precondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.019550" steps="153349"/></proof>
+  </goal>
+  <goal name="strip&#39;vc.2" expl="postcondition" proved="true">
+  <proof prover="0"><result status="timeout" time="1.000000"/></proof>
+  <proof prover="1"><result status="timeout" time="1.000000" steps="37080"/></proof>
+  <proof prover="2"><result status="timeout" time="1.000000" steps="3384265"/></proof>
+  <transf name="split_vc" proved="true" >
+   <goal name="strip&#39;vc.2.0" expl="postcondition" proved="true">
+   <proof prover="0"><result status="valid" time="0.213147" steps="73133"/></proof>
+   </goal>
+   <goal name="strip&#39;vc.2.1" expl="postcondition" proved="true">
+   <proof prover="0" timelimit="5" memlimit="2000"><result status="valid" time="2.788905" steps="470987"/></proof>
+   </goal>
+  </transf>
+  </goal>
+ </transf>
+ </goal>
+ <goal name="confluence&#39;vc" expl="VC for confluence" proved="true">
+ <transf name="induction_pr" proved="true" >
+  <goal name="confluence&#39;vc.0" expl="VC for confluence" proved="true">
+  <proof prover="2"><result status="valid" time="0.157531" steps="919857"/></proof>
+  </goal>
+  <goal name="confluence&#39;vc.1" expl="VC for confluence" proved="true">
+  <proof prover="2"><result status="valid" time="0.028648" steps="177853"/></proof>
+  </goal>
+ </transf>
+ </goal>
+ <goal name="aux_steps_from_final&#39;vc" expl="VC for aux_steps_from_final" proved="true">
+ <proof prover="0"><result status="timeout" time="1.000000"/></proof>
+ <proof prover="1"><result status="timeout" time="1.000000" steps="37031"/></proof>
+ <proof prover="2"><result status="timeout" time="1.000000" steps="3928315"/></proof>
+ <transf name="split_vc" proved="true" >
+  <goal name="aux_steps_from_final&#39;vc.0" expl="assertion" proved="true">
+  <proof prover="2"><result status="valid" time="0.018811" steps="158506"/></proof>
+  </goal>
+  <goal name="aux_steps_from_final&#39;vc.1" expl="assertion" proved="true">
+  <proof prover="1"><result status="valid" time="0.103324" steps="4619"/></proof>
+  </goal>
+  <goal name="aux_steps_from_final&#39;vc.2" expl="assertion" proved="true">
+  <proof prover="2"><result status="valid" time="0.029499" steps="208849"/></proof>
+  </goal>
+  <goal name="aux_steps_from_final&#39;vc.3" expl="assertion" proved="true">
+  <proof prover="0" timelimit="30" memlimit="4000"><result status="timeout" time="30.000000"/></proof>
+  <proof prover="1" timelimit="30" memlimit="4000"><result status="timeout" time="30.000000" steps="301766"/></proof>
+  <proof prover="2" timelimit="30" memlimit="4000"><result status="timeout" time="13.807298" steps="43240944"/></proof>
+  <transf name="compute_in_goal" proved="true" >
+   <goal name="aux_steps_from_final&#39;vc.3.0" expl="assertion" proved="true">
+   <proof prover="0"><result status="valid" time="0.065451" steps="30756"/></proof>
+   </goal>
+  </transf>
+  </goal>
+  <goal name="aux_steps_from_final&#39;vc.4" expl="postcondition" proved="true">
+  <proof prover="2"><result status="valid" time="0.021822" steps="174156"/></proof>
+  </goal>
+ </transf>
+ </goal>
+ <goal name="steps_from_final&#39;vc" expl="VC for steps_from_final" proved="true">
+ <proof prover="1"><result status="valid" time="0.060325" steps="2478"/></proof>
+ </goal>
+ <goal name="final_graph_equal_states&#39;vc" expl="VC for final_graph_equal_states" proved="true">
+ <proof prover="1"><result status="valid" time="0.088183" steps="3619"/></proof>
+ </goal>
+ <goal name="unique_final_configurations&#39;vc" expl="VC for unique_final_configurations" proved="true">
+ <proof prover="1"><result status="valid" time="0.059057" steps="2004"/></proof>
+ </goal>
+</theory>
+</file>
+</why3session>

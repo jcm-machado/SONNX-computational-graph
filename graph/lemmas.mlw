@@ -1,0 +1,229 @@
+module UtilsLemmas
+    use int.Int
+    use list.Mem
+    use list.List
+    use list.Length
+    use list.Append
+    use entities.TensorValue
+    use entities.TensorInstance
+    use entities.ComputationNode
+    use entities.State
+    use utils.Utils
+    use add.OPAddGraph
+    use matmul.OPMatmulGraph
+    use sigmoid.OPSigmoidGraph
+    use sgraph.Graph
+    use sgraph.ExecutionFunctions
+    use sgraph.ExecutionProperties
+    use sgraph.GraphExecution
+
+    let lemma steps_nonneg (g g': graph) (n: int)
+    requires { steps g g' n }
+    ensures  { n >= 0 }
+    = ()
+
+    let rec lemma uncomputed_get_tensors (tns: list tensor_instance) (s: state)
+    requires { forall tn: tensor_instance. Mem.mem tn tns -> is_none (s tn) }
+    ensures { forall t: tensor_value. Mem.mem t (Utils.get_tensors tns s) -> is_none t }
+    =
+    match tns with
+    | Nil -> ()
+    | Cons tn rest ->
+        assert { is_none (s tn) };
+        uncomputed_get_tensors rest s
+    end
+
+    let rec lemma computed_get_tensors (l: list tensor_instance) (g: graph)
+    requires { computed (Utils.get_tensors l g.state) }
+    ensures { forall tn: tensor_instance. Mem.mem tn l -> is_some (g.state tn) }
+    variant { l }
+    =
+    match l with
+    | Nil -> ()
+    | Cons tn rest ->
+        assert { is_some (g.state tn) };
+        computed_get_tensors rest g
+    end
+
+
+    let rec lemma computed_tensors (tns: list tensor_instance) (s: state)
+    requires { computed (Utils.get_tensors tns s) }
+    ensures  { forall tn: tensor_instance. Mem.mem tn tns -> is_some (s tn) }
+    variant  { tns }
+    =
+    match tns with
+    | Nil -> ()
+    | Cons tn rest ->
+        assert { is_some (s tn) };
+        computed_tensors rest s
+    end
+
+end
+
+module Refinement
+    use int.Int
+    use list.Mem
+    use list.List
+    use list.Length
+    use list.Append
+    use entities.TensorValue
+    use entities.TensorInstance
+    use entities.ComputationNode
+    use entities.State
+    use utils.Utils
+    use utils.GraphUtils
+    use add.OPAddGraph
+    use matmul.OPMatmulGraph
+    use sigmoid.OPSigmoidGraph
+    use sgraph.Graph
+    use sgraph.GraphExecution
+    use sgraph.ExecutionFunctions
+    use sgraph.ExecutionProperties
+    use UtilsLemmas
+
+    let lemma step_preserves_executability (c c': computation_node) (g: graph)
+    requires { is_executable c g }
+    requires { is_executable c' g }
+    requires { c <> c' }
+    ensures  { is_executable c' (execute c g) }
+    =
+    assert { Utils.get_tensors c'.inp g.state = Utils.get_tensors c'.inp ((execute c g).state) };
+    assert { Utils.get_tensors c'.out g.state = Utils.get_tensors c'.out ((execute c g).state) };
+    ()
+
+    let lemma execute_commute (c c': computation_node) (g: graph)
+    requires { is_executable c g }
+    requires { is_executable c' g }
+    requires { c <> c' }
+    ensures { execute c (execute c' g) = execute c' (execute c g) }
+    =
+    let op_exec_c = op_exec c (Utils.get_tensors c.inp g.state) in
+    let op_exec_c' = op_exec c' (Utils.get_tensors c'.inp g.state) in
+    assert { (execute c' g).state = update_all c'.out op_exec_c' g.state };
+    assert { (execute c g).state = update_all c.out op_exec_c g.state };
+    assert { (execute c (execute c' g)).state = update_all c.out op_exec_c (update_all c'.out op_exec_c' g.state) };
+    assert { (execute c' (execute c g)).state = update_all c'.out op_exec_c' (update_all c.out op_exec_c g.state) };
+    assert { update_all c.out op_exec_c (update_all c'.out op_exec_c' g.state) = update_all c'.out op_exec_c' (update_all c.out op_exec_c g.state) };
+    ()
+
+    predicate is_final (g: graph) =
+    let all_tns = g.Graph.gis ++ g.Graph.gos ++ g.Graph.its in
+    forall tn: tensor_instance. Mem.mem tn all_tns -> is_some (g.Graph.state tn)
+
+    let lemma stepind_preservation (g g1: graph)
+    requires { stepind g g1 }
+    ensures { g1.cns = g.cns }
+    ensures { g1.gis = g.gis }
+    ensures { g1.gos = g.gos }
+    ensures { g1.its = g.its }
+    =
+    ()
+
+    let lemma steps_preservation (g g1 : graph) (n: int)
+    requires { steps g g1 n }
+    ensures { g1.cns = g.cns }
+    ensures { g1.gis = g.gis }
+    ensures { g1.gos = g.gos }
+    ensures { g1.its = g.its }
+    =
+    ()
+
+    (* Prefixação *)
+    (* steps gw gw' k + stepind gy gw = steps gy gw' (k + 1) *)
+    let rec lemma trans_left (k : int)
+    requires { k >= 0 }
+    ensures  { forall gy gw gw': graph. steps gw gw' k -> stepind gy gw  -> steps gy gw' (k + 1) }
+    variant { k }
+    =
+    if k = 0 then
+        ()
+    else
+        trans_left (k - 1) 
+
+    (* steps gx gz k = stepind gx g2 + steps g2 gz (k - 1) *)
+    let rec lemma left_unfold (k : int)
+    requires { k > 0 }
+    ensures { forall gx gz: graph. steps gx gz k -> (exists g2: graph. stepind gx g2 /\ steps g2 gz (k - 1)) }
+    variant { k }
+    =
+    if k = 1 then 
+        ()
+    else
+        left_unfold (k - 1)
+
+    (* steps g gk n + steps gk gx m = steps g gx (n + m) *)
+    let lemma transitivity (g1 g2: graph) (n m: int)
+    requires { steps g1 g2 n }
+    ensures  { forall g3: graph, m: int. steps g2 g3 m -> steps g1 g3 (n + m) }
+    = 
+    () 
+
+    let lemma diamond (gx gy gz: graph)
+    requires { stepind gx gy }
+    requires { stepind gx gz }
+    ensures { gy = gz \/ (exists gw: graph. stepind gy gw /\ stepind gz gw) }
+    =
+    ()
+
+    (* stepind gx gy /\ steps gx gz k -> *)
+    (* steps gy gw p /\ steps gz gw p' *)
+    let rec lemma strip (k: int)
+    requires { k >= 0 }
+    ensures  { forall gx gy gz: graph.
+                stepind gx gy -> steps gx gz k ->
+                exists gw: graph, p p': int. steps gy gw p /\ steps gz gw p' }
+    variant  { k }
+    =
+    if k = 0 then begin
+        ()
+    end
+    else 
+        strip (k - 1)
+    
+    let lemma confluence (g ga gb: graph) (n m: int)
+    requires { steps g ga n }
+    ensures  { steps g gb m -> (exists gc: graph, n' m': int. steps ga gc n' /\ steps gb gc m') }
+    =
+    ()
+
+    let lemma aux_steps_from_final (c: computation_node) (g: graph)
+    requires { is_final g }
+    ensures { not (is_executable c g) }
+    =
+    assert { is_executable c g -> Mem.mem c g.cns };
+    assert { is_executable c g -> (forall tn: tensor_instance. Mem.mem tn c.out -> Mem.mem tn (g.gos ++ g.its)) };
+    assert { is_executable c g -> (forall tn: tensor_instance. Mem.mem tn c.out -> is_some (g.state tn)) };
+    assert { is_executable c g -> not (not_computed (Utils.get_tensors c.out g.state)) };
+    ()
+
+    let rec lemma steps_from_final (g g': graph) (n: int)
+    requires { steps g g' n }
+    requires { is_final g }
+    ensures { g' = g }
+    =
+    assert { forall c: computation_node. not (is_executable c g) };
+    ()
+
+    let lemma final_graph_equal_states (g g1 g2: graph) (n m: int)
+    requires { steps g g1 n }
+    requires { steps g g2 m }
+    requires { is_final g1 }
+    requires { is_final g2 }
+    ensures { g1.state = g2.state }
+    =
+    ()
+
+    (* Proved by:
+        - final_graph_equal_states
+        - steps_preservation *)
+    let lemma unique_final_configurations (g g1 g2: graph) (n m: int)
+    requires { steps g g1 n }
+    requires { steps g g2 m }
+    requires { is_final g1 }
+    requires { is_final g2 }
+    ensures { g1 = g2 }
+    =
+    assert { g1.cns = g2.cns /\ g1.gis = g2.gis /\ g1.gos = g2.gos /\ g1.its = g2.its };
+    assert { g1.state = g2.state };
+    ()
+end

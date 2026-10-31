@@ -1,0 +1,134 @@
+module Utils
+    use int.Int
+    use list.List
+    use list.Mem
+    use list.Append
+    use list.Length
+    use list.Map
+    use entities.ComputationNode
+    use entities.TensorInstance
+    use entities.State
+    use entities.TensorValue
+
+    function cn_get_ids (cns: list computation_node) : list int =
+    match cns with
+    | Nil -> Nil
+    | Cons cn rest -> Cons cn.id (cn_get_ids rest)
+    end
+
+    (*
+    function cn_get_ids2 (cns: list computation_node) : list int =
+    map id cns
+
+    let rec lemma test_rec (cns: list computation_node)
+    ensures { cn_get_ids cns = cn_get_ids2 cns }
+    variant { cns }
+    =
+    match cns with
+    | Cons h t -> test_rec t
+    | Nil -> True
+    end
+
+    lemma test:
+        forall l: list computation_node. cn_get_ids l = cn_get_ids2 l 
+    *)
+
+    function cn_get_outs (cns: list computation_node) : list tensor_instance =
+    match cns with
+    | Nil -> Nil
+    | Cons cn rest -> cn.out ++ cn_get_outs rest
+    end
+
+    function cn_get_inps (cns: list computation_node) : list tensor_instance =
+    match cns with
+    | Nil -> Nil
+    | Cons cn rest -> cn.inp ++ cn_get_inps rest
+    end
+
+    predicate cn_check_args (cn_arguments: list tensor_instance) (tns: list tensor_instance) =
+    match cn_arguments with
+    | Nil -> true
+    | Cons h t -> Mem.mem h tns /\ cn_check_args t tns
+    end
+
+    let rec ghost function get_tensor (l : list tensor_value) (pos: int) : tensor_value
+    requires { 0 <= pos < length l }
+    variant { l }
+    =
+    match l with
+    | Nil -> absurd
+    | Cons h t -> if pos = 0 then h else get_tensor t (pos - 1)
+    end
+
+    function get_tensors (tids: list tensor_instance) (state: state) : list tensor_value
+    =
+    match tids with
+    | Nil -> Nil
+    | Cons tid rest -> Cons (state tid) (get_tensors rest state)
+    end
+
+    (*
+    let rec ghost function my_get (l : list 'a) (pos: int) : 'a
+    requires { 0 <= pos < length l }
+    variant { l }
+    =
+    match l with
+    | Nil -> absurd
+    | Cons h t -> if pos = 0 then h else my_get t (pos - 1)
+    end
+
+    let rec lemma get_tensors_index (tids: list tensor_instance) (s: state)
+    ensures { length (get_tensors tids s) = length tids }
+    ensures { forall i: int. 0 <= i < length tids -> get_tensor (get_tensors tids s) i = s (my_get tids i)}
+    =
+    match tids with
+    | Nil -> ()
+    | Cons _ rest -> get_tensors_index rest s
+    end
+    *)
+
+end
+
+module GraphUtils
+    use list.List
+    use list.Mem
+    use entities.TensorInstance
+    use entities.ComputationNode
+
+    type vertex =
+        | T tensor_instance
+        | C computation_node
+
+    predicate cn_edge (c1: computation_node) (c2: computation_node) 
+    =
+    exists tn: tensor_instance. Mem.mem tn c1.out /\ Mem.mem tn c2.inp
+
+    predicate edge  (v v1: vertex) (gis gos: list tensor_instance) 
+                    (cns: list computation_node) 
+    =
+    match v, v1 with
+        | T t, C c -> Mem.mem t gis /\ Mem.mem c cns /\ Mem.mem t c.inp
+        | C c1, C c2 -> Mem.mem c1 cns /\ Mem.mem c2 cns /\ cn_edge c1 c2
+        | C c, T t -> Mem.mem c cns /\ Mem.mem t gos /\ Mem.mem t c.out
+        | _, _ -> false
+    end
+
+    inductive path  (v: vertex) (l: list (vertex)) (v1: vertex) 
+                    (gis gos: list tensor_instance) (cns: list computation_node) 
+    =
+    | Path_empty:
+        forall x: vertex, gis gos: list tensor_instance, cns: list computation_node. 
+        path x Nil x gis gos cns
+    | Path_cons:
+        forall x y z: vertex, l: list (vertex), gis gos: list tensor_instance, cns: list computation_node.
+        edge x y gis gos cns -> path y l z gis gos cns -> path x (Cons x l) z gis gos cns
+
+    predicate has_cycle (c: computation_node) (gis gos: list tensor_instance) 
+                        (cns: list computation_node) =
+        exists l: list (vertex). l <> Nil /\ path (C c) l (C c) gis gos cns
+
+    predicate reachable (v: vertex) (t: tensor_instance) (gis gos: list tensor_instance) 
+                                (cns: list computation_node) =
+        exists l: list (vertex). l <> Nil /\ Mem.mem t gos /\ path v l (T t) gis gos cns
+
+end

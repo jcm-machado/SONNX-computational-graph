@@ -1,0 +1,120 @@
+module OPSigmoid
+    use tensor.Tensor
+    use tensor.Range
+    use real.Real
+    use real.ExpLog
+
+    let ghost function dsigmoid(x: tensor real): data real
+    =
+    fun ks ->
+        if valid ks x.dims then
+            1.0 / (1.0 + exp(-(x.data ks)))
+        else
+            x.background
+
+    let ghost function sigmoid (x: tensor real): tensor real
+    ensures { x ~= result }
+    ensures { result.data = dsigmoid x }
+    =
+    { dims = x.dims; data = dsigmoid x; background = x.background }
+
+end
+
+module OPSigmoidGraph
+    use option.Option
+    use entities.WrapperTensor
+    use entities.TensorValue
+    use OPSigmoid
+
+    predicate constraints (x: tensor_value) =
+    match x with
+        | Some (R _) -> true
+        | _ -> false
+    end
+
+    let ghost function sigmoid_graph (x: tensor_value) : tensor_value
+    requires { constraints x }
+    =
+    match x with
+        | Some (R x_real) -> Some (R (OPSigmoid.sigmoid x_real))
+        | _ -> None
+    end
+
+end
+
+module COPSigmoid
+    use OPSigmoid
+    use int.Int
+    use mach.int.Int32
+    use tensor.Tensor
+    use libtensor.CTensor
+    use libvector.CIndex
+    use std.Cfloat
+    use std.Clib
+    
+    let ctensor_sigmoid (x r: ctensor) 
+    requires { valid_tensor x }
+    requires { valid_tensor r }
+    requires { ref_tensor x ~= ref_tensor r }
+    ensures { ref_tensor r = sigmoid (ref_tensor x) }
+    =
+    let m = cdim_size r.t_dims r.t_rank in
+    for i = 0 to m-1 do
+        invariant {
+            forall k. 0 <= k < i -> value_at r.t_data k = Real.(1.0 / (1.0 + ExpLog.exp(-(value_at x.t_data k))))
+        }
+        r.t_data[i] <-  (f32 1.0) ./ ( (f32 1.0) .+ exp (.-(x.t_data[i])) )
+    done;
+    assert { ref_tensor r == sigmoid (ref_tensor x) }
+    
+end
+
+module COPSigmoidGraph
+    use mach.c.C
+    use int.Int
+    (* use map.Map *)
+    (* use option.Option *)
+    use array.Array
+    use centities.CEntities
+    use libtensor.CTensor
+    use tensor.Tensor
+    use COPSigmoid
+    use std.Clib
+
+    predicate constraints (x r: ctensor_value) =
+    let x' = x.value in
+    let r' = r.value in
+    valid_tensor x' /\
+    valid_tensor r' /\
+    ref_tensor x' ~= ref_tensor r'
+
+    let csigmoid_graph (x r: ctensor_value)
+    requires { constraints x r }
+    =
+    ctensor_sigmoid x.value r.value
+    
+    val get (p:ptr ctensor_value) : ctensor_value
+    requires { p.min <= p.offset < p.max }
+    ensures { result = Map.get (pelts p) (p.offset) }
+
+    val set (p:ptr ctensor_value) (v:ctensor_value) : unit
+    requires { p.min <= p.offset < p.max }
+    requires { writable p }
+    ensures { pelts p = Map.set (pelts (old p)) p.offset v }
+    writes { C.(p.data.elts) }
+
+    let csigmoid_graph_ptr (x: ctensor_value) (r: ptr ctensor_value)
+    requires { constraints x (Map.get (pelts r) (r.offset)) }
+    requires { valid_range r 0 1 }
+    requires { writable r }
+    ensures { (Map.get (pelts r) (r.offset)).CEntities.computed = true }
+    ensures { CTensor.ref_tensor (Map.get (pelts r) (r.offset)).value = OPSigmoid.sigmoid (CTensor.ref_tensor x.value) }
+    ensures { forall j: int. j <> r.offset -> Map.get (pelts r) j = Map.get (pelts (old r)) j }
+    ensures { CTensor.valid_tensor (Map.get (pelts r) r.offset).value }
+    =
+    let ref r_val = get r in
+    ctensor_sigmoid x.value r_val.value;
+    r_val.computed <- true;
+    set r r_val
+
+end

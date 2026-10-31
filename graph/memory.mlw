@@ -1,0 +1,173 @@
+module Ctensor_value
+    use int.Int
+    use map.Map
+    use list.List
+    use list.Length
+    use list.Append
+    use list.NumOcc
+    use mach.c.C
+    use mach.int.Int32
+    use array.Array
+    use libtensor.CTensor
+    use libvector.CIndex
+    use tensor.Tensor
+    use std.Clib
+    use centities.CEntities
+
+    (** Memory management - Implementation **)
+    val incr_ctensor_value (p:ptr ctensor_value) (ofs:int32) : ptr ctensor_value
+    requires { p.min <= p.offset + ofs <= p.max }
+    ensures { result.offset = p.offset + ofs }
+    ensures { plength result = plength p }
+    ensures { pelts result = pelts p }
+    ensures { result.data = p.data }
+    ensures { result.min = p.min }
+    ensures { result.max = p.max }
+    ensures { result.zone = p.zone }
+    ensures { result.writable = p.writable }
+    alias { p.data with result.data }
+
+    val get_ctensor_value (p:ptr ctensor_value) : ctensor_value
+    requires { p.min <= p.offset < p.max }
+    ensures { result = Map.get (pelts p) (p.offset) }
+
+    let get_ofs_ctensor_value (p:ptr ctensor_value) (ofs:int32) : ctensor_value
+    requires { p.min <= p.offset + ofs < p.max }
+    ensures { result = Map.get (pelts p) (p.offset + ofs) }
+    = get_ctensor_value (incr_ctensor_value p ofs)
+
+    val set_ctensor_value (p:ptr ctensor_value) (v:ctensor_value) : unit
+    requires { p.min <= p.offset < p.max }
+    requires { writable p }
+    ensures { pelts p = Map.set (pelts (old p)) p.offset v }
+    writes { p.data.elts }
+
+    let set_ofs_ctensor_value (p:ptr ctensor_value) (ofs:int32) (v:ctensor_value) : unit
+    requires { p.min <= p.offset + ofs < p.max }
+    requires { writable p }
+    ensures { pelts p = Map.set (pelts (old p)) (p.offset + ofs) v }
+    ensures { Map.get (pelts p) (p.offset + ofs) = v }
+    writes { p.data.elts }
+    =
+    set_ctensor_value (incr_ctensor_value p ofs) v
+    (** -------------------------- **)
+
+    (** Memory management - Verification **)
+    let ghost function value_at_ctensor_value (vp : ptr ctensor_value) : map int ctensor_value 
+    = pure { fun k -> vp.data.Array.elts (vp.offset + k) }
+
+    let rec ghost function slice_ctensor_value (u : ptr ctensor_value) (p q : int) : list ctensor_value 
+    = variant { q - p }
+    if q <= p then Nil else Cons (value_at_ctensor_value u p) (slice_ctensor_value u (p+1) q)
+
+    let ghost function vector_ctensor_value (u : ptr ctensor_value) (n : int)
+    = slice_ctensor_value u 0 n
+    (** -------------------------- **)
+
+    (** Lemmas relating both memory models **)
+    (** 1. Slice applied to equal "memory regions" return the same result **)
+    let rec lemma slices_eq (u1 u2: ptr ctensor_value) (p q: int)
+    requires { p <= q }
+    requires { forall j. p <= j < q -> value_at u1 j = value_at u2 j }
+    ensures  { slice_ctensor_value u1 p q = slice_ctensor_value u2 p q }
+    variant  { q - p }
+    =
+    if q <= p then () else slices_eq u1 u2 (p+1) q
+
+    function count_uncomputed_list (l: list ctensor_value) : int =
+    match l with
+    | Nil -> 0
+    | Cons h t -> (if h.computed then 0 else 1) + count_uncomputed_list t
+    end
+
+    let rec lemma count_uncomputed_list_nonneg (l: list ctensor_value)
+    ensures { count_uncomputed_list l >= 0 }
+    =
+    match l with
+        | Nil -> ()
+        | Cons h t ->
+            count_uncomputed_list_nonneg t
+    end
+
+    (** 2. "Memory regions" overalapping their state in every entry but one yield count_uncomputed_list differing one unit **)
+    let rec lemma count_decr_at (u1 u2: ptr ctensor_value) (p q k : int)
+    requires { p <= k < q }
+    requires { forall j:int. (p <= j < q /\ j <> k) -> value_at u1 j = value_at u2 j }
+    requires { (value_at u1 k).computed = false }
+    requires { (value_at u2 k).computed = true }
+    ensures { count_uncomputed_list (slice_ctensor_value u1 p q) = count_uncomputed_list (slice_ctensor_value u2 p q) + 1 }
+    variant { q - p }
+    =
+    if p = k then 
+        slices_eq u1 u2 (p+1) q
+    else
+        count_decr_at u1 u2 (p+1) q k
+    (** -------------------------- **)
+end
+
+module Ccomputation_node
+    use int.Int
+    use map.Map
+    use list.List
+    use list.Length
+    use list.Append
+    use list.NumOcc
+    use mach.c.C
+    use mach.int.Int32
+    use array.Array
+    use libtensor.CTensor
+    use libvector.CIndex
+    use tensor.Tensor
+    use std.Clib
+    use centities.CEntities
+    use cGraph.CGraph
+    use entities.Operator
+
+    (** Memory management - Implementation **)
+    val incr_cn (p:ptr ccomputation_node) (ofs:int32) : ptr ccomputation_node
+    requires { p.min <= p.offset + ofs <= p.max }
+    ensures { result.offset = p.offset + ofs }
+    ensures { plength result = plength p }
+    ensures { pelts result = pelts p }
+    ensures { result.data = p.data }
+    ensures { result.min = p.min }
+    ensures { result.max = p.max }
+    ensures { result.zone = p.zone }
+    ensures { result.writable = p.writable }
+    alias { p.data with result.data }
+
+    val get_cn (p:ptr ccomputation_node) : ccomputation_node
+    requires { p.min <= p.offset < p.max }
+    ensures { result = Map.get (pelts p) (p.offset) }
+
+    let get_ofs_cn (p:ptr ccomputation_node) (ofs:int32) : ccomputation_node
+    requires { p.min <= p.offset + ofs < p.max }
+    ensures { result = Map.get (pelts p) (p.offset + ofs) }
+    = 
+    get_cn (incr_cn p ofs)
+    (** -------------------------- **)
+    
+    (** Memory management - Verification **)
+    let ghost function value_at_cn (vp : ptr ccomputation_node) : map int ccomputation_node 
+    =
+    pure { fun k -> vp.data.Array.elts (vp.offset + k) }
+
+    let rec ghost function slice_cn (cns: ptr ccomputation_node) (p: int) (q: int) : list ccomputation_node =
+    variant { q - p }
+    if q <= p then Nil else Cons (value_at_cn cns p) (slice_cn cns (p+1) q)
+
+    let ghost function vector_cn (cns: ptr ccomputation_node) (n: int) : list ccomputation_node =
+    slice_cn cns 0 n
+
+    predicate cn_at (cn: ccomputation_node) (id: int) (g: cgraph)
+    =
+    0 <= id < to_int g.num_cns /\ cn = value_at_cn g.cns id
+    
+    let rec lemma slice_cn_mem (u : ptr ccomputation_node) (p q i : int)
+    requires { p <= i < q }
+    ensures { Mem.mem (value_at_cn u i) (slice_cn u p q)}
+    variant { q - p }
+    = 
+    if i = p then ()
+    else slice_cn_mem u (p+1) q i
+end

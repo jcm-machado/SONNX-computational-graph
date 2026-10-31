@@ -1,0 +1,373 @@
+module CGraphExec
+    use int.Int
+    use map.Map
+    use option.Option
+    use list.List
+    use list.Length
+    use list.Append
+    use list.NumOcc
+    use mach.c.C
+    use mach.int.Int32
+    use array.Array
+    use libtensor.CTensor
+    use libvector.CIndex
+    use tensor.Tensor
+    use std.Clib
+    use entities.WrapperTensor
+    use entities.TensorValue
+    use entities.State
+    use entities.TensorInstance
+    use entities.Operator
+    use entities.ComputationNode
+    use utils.Utils
+    use utils.GraphUtils
+    use sgraph.Graph
+    use sgraph.ExecutionProperties
+    use sgraph.ExecutionFunctions
+    use sgraph.GraphExecution
+    use cGraph.CGraph
+    use cRefinement.Refinement
+    use centities.CEntities
+    use add.COPAddGraph
+    use add.OPAddGraph
+    use matmul.COPMatmulGraph
+    use matmul.OPMatmulGraph
+    use sigmoid.COPSigmoidGraph
+    use sigmoid.OPSigmoidGraph
+    use list.Map
+    use lemmas.Refinement
+    use memory.Ctensor_value
+    use memory.Ccomputation_node
+
+    let rec lemma slice_mem (u : ptr 'a) (p q i : int)
+    requires { p <= i < q }
+    ensures { Mem.mem (value_at u i) (slice u p q) }
+    variant { i - p }
+    = 
+    if i = p then ()
+    else slice_mem u (p+1) q i
+
+    let lemma ivector_mem (u : iarray) (n i : int)
+    requires { 0 <= i < n }
+    ensures { Mem.mem (Int32.to_int (value_at u i)) (ivector u n) }
+    = 
+    slice_mem u 0 n i
+
+    predicate computed_inputs (c: ccomputation_node) (state: cstate)
+    = (forall i: int. 0 <= i < to_int c.num_inputs ->
+        0 <= to_int (value_at c.inputs i) < to_int state.num_values /\
+        (value_at state.values (to_int (value_at c.inputs i))).computed = true)
+    
+    predicate uncomputed_outputs (c: ccomputation_node) (state: cstate)
+    = (forall i: int. 0 <= i < to_int c.num_outputs ->
+        0 <= to_int (value_at c.outputs i) < to_int state.num_values /\   
+        (value_at state.values (to_int (value_at c.outputs i))).computed = false)
+
+    predicate constraints_compliance (c: ccomputation_node) (state: cstate) =
+    match c.op with
+    | Add ->
+        let in1 = value_at state.values (to_int (value_at c.inputs 0)) in
+        let in2 = value_at state.values (to_int (value_at c.inputs 1)) in
+        let out1 = value_at state.values (to_int (value_at c.outputs 0)) in
+        COPAddGraph.constraints in1 in2 out1
+    | Matmul ->
+        let in1 = value_at state.values (to_int (value_at c.inputs 0)) in
+        let in2 = value_at state.values (to_int (value_at c.inputs 1)) in
+        let out1 = value_at state.values (to_int (value_at c.outputs 0)) in
+        COPMatmulGraph.constraints in1 in2 out1
+    | Sigmoid ->
+        let in1 = value_at state.values (to_int (value_at c.inputs 0)) in
+        let out1 = value_at state.values (to_int (value_at c.outputs 0)) in
+        COPSigmoidGraph.constraints in1 out1
+    | _ -> False
+    end
+
+    let lemma constraints_compliance_equiv (c: ccomputation_node) (ghost id: int) (cstate: cstate)
+    requires { valid_cn c }
+    requires { valid_cstate cstate }
+    requires { constraints_compliance c cstate }
+    requires { computed_inputs c cstate }
+    ensures { ExecutionFunctions.constraints_compliance (ref_computation_node c id)
+            (Utils.get_tensors (ref_computation_node c id).ComputationNode.inp (ref_state cstate)) }
+    =
+    match c.op with
+    | Sigmoid ->
+        assert { Mem.mem (to_int (value_at c.inputs 0)) (ivector c.inputs (to_int c.num_inputs)) };
+        assert { ivector c.inputs (to_int c.num_inputs) = Cons (to_int (value_at c.inputs 0)) Nil };
+        assert { ref_state cstate (to_int (value_at c.inputs 0)) =
+                get_tensor (get_tensors (ref_computation_node c id).ComputationNode.inp (ref_state cstate)) 0 };
+        ()
+    | Add ->
+        assert { Mem.mem (to_int (value_at c.inputs 0)) (ivector c.inputs (to_int c.num_inputs)) };
+        assert { Mem.mem (to_int (value_at c.inputs 1)) (ivector c.inputs (to_int c.num_inputs)) };
+        assert { ivector c.inputs (to_int c.num_inputs) = Cons (to_int (value_at c.inputs 0)) (Cons (to_int (value_at c.inputs 1)) Nil) };
+        assert { ref_state cstate (to_int (value_at c.inputs 0)) =
+                get_tensor (get_tensors (ref_computation_node c id).ComputationNode.inp (ref_state cstate)) 0 };
+        assert { ref_state cstate (to_int (value_at c.inputs 1)) =
+                get_tensor (get_tensors (ref_computation_node c id).ComputationNode.inp (ref_state cstate)) 1 };
+        ()
+    | Matmul ->
+        assert { Mem.mem (to_int (value_at c.inputs 0)) (ivector c.inputs (to_int c.num_inputs)) };
+        assert { Mem.mem (to_int (value_at c.inputs 1)) (ivector c.inputs (to_int c.num_inputs)) };
+        assert { ivector c.inputs (to_int c.num_inputs) = Cons (to_int (value_at c.inputs 0)) (Cons (to_int (value_at c.inputs 1)) Nil) };
+        assert { ref_state cstate (to_int (value_at c.inputs 0)) =
+                get_tensor (get_tensors (ref_computation_node c id).ComputationNode.inp (ref_state cstate)) 0 };
+        assert { ref_state cstate (to_int (value_at c.inputs 1)) =
+                get_tensor (get_tensors (ref_computation_node c id).ComputationNode.inp (ref_state cstate)) 1 };
+        ()
+    | _ -> absurd
+    end
+
+    predicate is_executable (c: ccomputation_node) (id: int) (g: cgraph) =
+    cn_at c id g /\
+    constraints_compliance c g.state /\
+    computed_inputs c g.state /\
+    uncomputed_outputs c g.state
+
+    let lemma is_executable_equiv (c: ccomputation_node) (ghost id: int) (g: cgraph)
+    requires { valid_cn c }
+    requires { valid_cgraph g }
+    requires { cgraph_constraints g }
+    requires { is_executable c id g }
+    ensures { ExecutionFunctions.is_executable (ref_computation_node c id) (ref_graph g) }
+    = 
+    (* assert { ref_cns (vector_cn g.cns (to_int g.num_cns)) = (ref_graph g).Graph.cns };
+    assert { Mem.mem (ref_computation_node c id) (ref_graph g).Graph.cns }; *)
+    assert { (ref_graph g).Graph.state = ref_state g.state };
+    (* assert { ExecutionFunctions.constraints_compliance (ref_computation_node c id) (Utils.get_tensors (ref_computation_node c id).ComputationNode.inp (ref_state g.state)) }; *)
+    assert { forall i: int. 0 <= i < to_int c.num_inputs -> is_some (ref_state g.state (to_int (value_at c.inputs i))) };
+    assert { forall i: int. 0 <= i < to_int c.num_outputs -> is_none (ref_state g.state (to_int (value_at c.outputs i))) };
+    ()
+
+    let ghost function count_uncomputed (g: cgraph) : int =
+    count_uncomputed_list (vector_ctensor_value g.state.values (to_int g.state.num_values))
+    
+    let single_exec (c: ccomputation_node) (ghost id: int) (g: cgraph) : bool
+    requires { valid_cn c }
+    requires { cn_at c id g }
+    requires { valid_cgraph g }
+    requires { cgraph_constraints g }
+    requires { is_executable c id g }
+    requires { writable g.state.values }
+    ensures { valid_cgraph g }
+    ensures { cgraph_constraints g }
+    ensures { result -> ref_graph g = execute (ref_computation_node c id) (ref_graph (old g)) }
+    ensures { result -> count_uncomputed g < count_uncomputed (old g) }
+    ensures { count_uncomputed g <= count_uncomputed (old g) }
+    ensures { not result -> ref_graph g = ref_graph (old g) }
+    = match c.op with
+    | Add ->
+        let in1 = get_ofs_ctensor_value g.state.values c.inputs[0] in
+        let in2 = get_ofs_ctensor_value g.state.values c.inputs[1] in
+        let out = incr_ctensor_value g.state.values c.outputs[0] in
+        cadd_graph_ptr in1 in2 out;
+        (** 2nd, 3rd and 4th post-conditions - Proof guidance **)
+        assert { (value_at (g.state.values) (to_int (value_at c.outputs 0))).computed };
+        assert { forall i:int. i <> to_int (value_at c.outputs 0) -> (value_at g.state.values i) = (value_at (old g).state.values i) };
+        assert { forall i:int. 0 <= i < to_int g.state.num_values -> i <> to_int (value_at c.outputs 0) -> 
+                            (value_at g.state.values i).computed -> valid_tensor (value_at g.state.values i).value };
+        assert { valid_cstate g.state };
+        (** ----------------------------------- **)
+        (** 1st post-condition - Proof guidance **)
+        (* To use the abstract execute post-conditions *)
+        assert { valid_cgraph g };
+        assert { cgraph_constraints g };
+        assert { ExecutionFunctions.is_executable (ref_computation_node c id) (ref_graph (old g)) };
+        (* Structural components *)
+        assert { (ref_graph g).Graph.cns = (execute (ref_computation_node c id) (ref_graph (old g))).Graph.cns };
+        assert { (ref_graph g).Graph.gis = (execute (ref_computation_node c id) (ref_graph (old g))).Graph.gis };
+        assert { (ref_graph g).Graph.gos = (execute (ref_computation_node c id) (ref_graph (old g))).Graph.gos };
+        assert { (ref_graph g).Graph.its = (execute (ref_computation_node c id) (ref_graph (old g))).Graph.its };
+        (* State *)
+        (* 1. Frame condition *)
+        assert { forall i: int. i <> to_int (value_at c.outputs 0) -> ref_state g.state i = ref_state (old g).state i };
+        (* 2. Abstract and Concrete executions return the same output *)
+        assert { Mem.mem (to_int (value_at c.inputs 0)) (ivector c.inputs (to_int c.num_inputs)) };
+        assert { Mem.mem (to_int (value_at c.inputs 1)) (ivector c.inputs (to_int c.num_inputs)) };
+        assert { Mem.mem (to_int (value_at c.outputs 0)) (ivector c.outputs (to_int c.num_outputs)) };
+        assert { ref_state (old g).state (to_int (value_at c.inputs 0)) = ref_tensor_single in1 };
+        assert { ref_state (old g).state (to_int (value_at c.inputs 1)) = ref_tensor_single in2 };
+        assert { ivector c.inputs (to_int c.num_inputs) = Cons (to_int (value_at c.inputs 0)) (Cons (to_int (value_at c.inputs 1)) Nil) };
+        assert { (ref_computation_node c id).ComputationNode.inp = Cons (to_int (value_at c.inputs 0)) (Cons (to_int (value_at c.inputs 1)) Nil) };
+        assert { Utils.get_tensors (ref_computation_node c id).ComputationNode.inp (ref_graph (old g)).Graph.state =
+                Cons (Some (R (CTensor.ref_tensor in1.value))) (Cons (Some (R (CTensor.ref_tensor in2.value))) Nil)
+        };
+        assert { ref_state g.state (to_int (value_at c.outputs 0)) = ref_tensor_single (Map.get (pelts g.state.values) (g.state.values.offset + to_int (value_at c.outputs 0))) };
+        assert { ref_tensor_single (Map.get (pelts g.state.values) (g.state.values.offset + to_int (value_at c.outputs 0))) = OPAddGraph.add_graph (Some (R (CTensor.ref_tensor in1.value))) (Some (R (CTensor.ref_tensor in2.value))) };
+        assert { ref_state g.state (to_int (value_at c.outputs 0)) =
+                OPAddGraph.add_graph (Some (R (CTensor.ref_tensor in1.value))) (Some (R (CTensor.ref_tensor in2.value))) 
+        };
+        assert { (ref_graph g).Graph.state = update_all (ref_computation_node c id).ComputationNode.out 
+                    (op_exec (ref_computation_node c id) (Utils.get_tensors (ref_computation_node c id).ComputationNode.inp (ref_graph (old g)).Graph.state)) 
+                    (ref_graph (old g)).Graph.state };
+        assert { (ref_graph g).Graph.state = (execute (ref_computation_node c id) (ref_graph (old g))).Graph.state };
+        (** ----------------------------------- **)
+        true
+    | Matmul ->
+        let in1 = get_ofs_ctensor_value g.state.values c.inputs[0] in
+        let in2 = get_ofs_ctensor_value g.state.values c.inputs[1] in
+        let out1 = get_ofs_ctensor_value g.state.values c.outputs[0] in
+        let flag = cmatmul_graph_ptr in1 in2 (incr_ctensor_value g.state.values c.outputs[0]) in
+        if flag then begin
+            (** 2nd & 3rd post-conditions - Proof guidance **)
+            assert { (value_at (g.state.values) (to_int (value_at c.outputs 0))).computed };
+            assert { forall i:int. i <> to_int (value_at c.outputs 0) -> (value_at g.state.values i) = (value_at (old g).state.values i) };
+            (** ----------------------------------- **)
+            (** 4th post-condition - Proof guidance **)
+            assert { forall i:int. 0 <= i < to_int g.state.num_values -> i <> to_int (value_at c.outputs 0) -> 
+                                (value_at g.state.values i).computed -> valid_tensor (value_at g.state.values i).value };
+            assert { valid_cstate g.state };
+            (** ----------------------------------- **)
+            (** 1st post-condition - Proof guidance **)
+            (* To use the abstract execute post-conditions *)
+            assert { valid_cgraph g };
+            assert { cgraph_constraints g };
+            assert { ExecutionFunctions.is_executable (ref_computation_node c id) (ref_graph (old g)) };
+            (* Structural components *)
+            assert { (ref_graph g).Graph.cns = (execute (ref_computation_node c id) (ref_graph (old g))).Graph.cns };
+            assert { (ref_graph g).Graph.gis = (execute (ref_computation_node c id) (ref_graph (old g))).Graph.gis };
+            assert { (ref_graph g).Graph.gos = (execute (ref_computation_node c id) (ref_graph (old g))).Graph.gos };
+            assert { (ref_graph g).Graph.its = (execute (ref_computation_node c id) (ref_graph (old g))).Graph.its };
+            (* State *)
+            (* 1. Frame condition *)
+            assert { forall i: int. i <> to_int (value_at c.outputs 0) -> ref_state g.state i = ref_state (old g).state i };
+            (* 2. Abstract and Concrete executions return the same output *)
+            assert { Mem.mem (to_int (value_at c.inputs 0)) (ivector c.inputs (to_int c.num_inputs)) };
+            assert { Mem.mem (to_int (value_at c.inputs 1)) (ivector c.inputs (to_int c.num_inputs)) };
+            assert { Mem.mem (to_int (value_at c.outputs 0)) (ivector c.outputs (to_int c.num_outputs)) };
+            assert { ref_state (old g).state (to_int (value_at c.inputs 0)) = ref_tensor_single in1 };
+            assert { ref_state (old g).state (to_int (value_at c.inputs 1)) = ref_tensor_single in2 };
+            assert { ivector c.inputs (to_int c.num_inputs) = Cons (to_int (value_at c.inputs 0)) (Cons (to_int (value_at c.inputs 1)) Nil) };
+            assert { (ref_computation_node c id).ComputationNode.inp = Cons (to_int (value_at c.inputs 0)) (Cons (to_int (value_at c.inputs 1)) Nil) };
+            assert { Utils.get_tensors (ref_computation_node c id).ComputationNode.inp (ref_graph (old g)).Graph.state =
+                    Cons (Some (R (CTensor.ref_tensor in1.value))) (Cons (Some (R (CTensor.ref_tensor in2.value))) Nil)
+            };
+            assert { ref_state g.state (to_int (value_at c.outputs 0)) = ref_tensor_single (Map.get (pelts g.state.values) (g.state.values.offset + to_int (value_at c.outputs 0))) };
+            assert { ref_tensor_single (Map.get (pelts g.state.values) (g.state.values.offset + to_int (value_at c.outputs 0))) = OPMatmulGraph.matmul_graph (Some (R (CTensor.ref_tensor in1.value))) (Some (R (CTensor.ref_tensor in2.value))) };
+            assert { ref_state g.state (to_int (value_at c.outputs 0)) =
+                    OPMatmulGraph.matmul_graph (Some (R (CTensor.ref_tensor in1.value))) (Some (R (CTensor.ref_tensor in2.value))) 
+            };
+            assert { (ref_graph g).Graph.state = update_all (ref_computation_node c id).ComputationNode.out 
+                        (op_exec (ref_computation_node c id) (Utils.get_tensors (ref_computation_node c id).ComputationNode.inp 
+                        (ref_graph (old g)).Graph.state)) (ref_graph (old g)).Graph.state };
+            assert { (ref_graph g).Graph.state = (execute (ref_computation_node c id) (ref_graph (old g))).Graph.state };
+            (** ----------------------------------- **)
+            true
+        end
+        else begin
+            assert { forall i:int. (value_at g.state.values i) = (value_at (old g).state.values i) };
+            assert { valid_cgraph g };
+            assert { cgraph_constraints g };
+            assert { (ref_graph (old g)).Graph.cns = (ref_graph g).Graph.cns };
+            assert { (ref_graph (old g)).Graph.gis = (ref_graph g).Graph.gis };
+            assert { (ref_graph (old g)).Graph.gos = (ref_graph g).Graph.gos };
+            assert { (ref_graph (old g)).Graph.its = (ref_graph g).Graph.its };
+            assert { (ref_graph (old g)).Graph.state = (ref_graph g).Graph.state };
+            false
+        end
+    | Sigmoid ->
+        let in1 = get_ofs_ctensor_value g.state.values c.inputs[0] in
+        csigmoid_graph_ptr in1 (incr_ctensor_value g.state.values c.outputs[0]);
+        (** 2nd & 3rd post-conditions - Proof guidance **)
+        assert { (value_at (g.state.values) (to_int (value_at c.outputs 0))).computed };
+        assert { forall i:int. i <> to_int (value_at c.outputs 0) -> (value_at g.state.values i) = (value_at (old g).state.values i) };
+        (** ----------------------------------- **)
+        (** 4th post-condition - Proof guidance **)
+        assert { forall i:int. 0 <= i < to_int g.state.num_values -> i <> to_int (value_at c.outputs 0) -> 
+                            (value_at g.state.values i).computed -> valid_tensor (value_at g.state.values i).value };
+        assert { valid_cstate g.state };
+        (** ----------------------------------- **)
+        (** 1st post-condition - Proof guidance **)
+        (* To use the abstract execute post-conditions *)
+        assert { valid_cgraph g };
+        assert { cgraph_constraints g };
+        assert { ExecutionFunctions.is_executable (ref_computation_node c id) (ref_graph (old g)) };
+        (* Structural components *)
+        assert { (ref_graph g).Graph.cns = (execute (ref_computation_node c id) (ref_graph (old g))).Graph.cns };
+        assert { (ref_graph g).Graph.gis = (execute (ref_computation_node c id) (ref_graph (old g))).Graph.gis };
+        assert { (ref_graph g).Graph.gos = (execute (ref_computation_node c id) (ref_graph (old g))).Graph.gos };
+        assert { (ref_graph g).Graph.its = (execute (ref_computation_node c id) (ref_graph (old g))).Graph.its };
+        (* State *)
+        (* 1. Frame condition *)
+        assert { forall i: int. i <> to_int (value_at c.outputs 0) -> ref_state g.state i = ref_state (old g).state i };
+        (* 2. Abstract and Concrete executions return the same output *)
+        assert { Mem.mem (to_int (value_at c.inputs 0)) (ivector c.inputs (to_int c.num_inputs)) };
+        assert { Mem.mem (to_int (value_at c.outputs 0)) (ivector c.outputs (to_int c.num_outputs)) };
+        assert { ref_state (old g).state (to_int (value_at c.inputs 0)) = ref_tensor_single in1 };
+        assert { ivector c.inputs (to_int c.num_inputs) = Cons (to_int (value_at c.inputs 0)) Nil };
+        assert { (ref_computation_node c id).ComputationNode.inp = Cons (to_int (value_at c.inputs 0)) Nil };
+        assert { Utils.get_tensors (ref_computation_node c id).ComputationNode.inp (ref_graph (old g)).Graph.state = 
+        Cons (Some (R (CTensor.ref_tensor in1.value))) Nil };
+        assert { ref_state g.state (to_int (value_at c.outputs 0)) = ref_tensor_single (Map.get (pelts g.state.values) (g.state.values.offset + to_int (value_at c.outputs 0))) };
+        assert { ref_tensor_single (Map.get (pelts g.state.values) (g.state.values.offset + to_int (value_at c.outputs 0))) = OPSigmoidGraph.sigmoid_graph (Some (R (CTensor.ref_tensor in1.value))) };
+        assert { ref_state g.state (to_int (value_at c.outputs 0)) = OPSigmoidGraph.sigmoid_graph (Some (R (CTensor.ref_tensor in1.value))) };
+        assert { (ref_graph g).Graph.state = update_all (ref_computation_node c id).ComputationNode.out 
+                    (op_exec (ref_computation_node c id) (Utils.get_tensors (ref_computation_node c id).ComputationNode.inp 
+                    (ref_graph (old g)).Graph.state)) (ref_graph (old g)).Graph.state };
+        assert { (ref_graph g).Graph.state = (execute (ref_computation_node c id) (ref_graph (old g))).Graph.state };
+        (** ----------------------------------- **)
+        true
+    | _ -> false
+    end
+
+    let c_execute (c: ccomputation_node) (ghost id: int) (g: cgraph)
+    requires { valid_cgraph g }
+    requires { cgraph_constraints g }
+    requires { valid_cn c }
+    requires { cn_at c id g }
+    requires { is_executable c id g }
+    requires { writable g.state.values }
+    ensures { result -> ref_graph g = execute (ref_computation_node c id) (ref_graph (old g)) }
+    ensures { result -> count_uncomputed g < count_uncomputed (old g) }
+    ensures { count_uncomputed g <= count_uncomputed (old g) }
+    ensures { valid_cgraph g }
+    ensures { cgraph_constraints g }
+    ensures { result -> stepind (ref_graph (old g)) (ref_graph g) }
+    ensures { not result -> ref_graph g = ref_graph (old g) }
+    =
+    let flag = single_exec c id g in
+    flag
+
+    (* TODO CHANGE THIS *)
+    val is_executable (c: ccomputation_node) (id: int) (g: cgraph) : bool
+    requires { valid_cgraph g }
+    requires { valid_cn c }
+    requires { cn_at c id g }
+    ensures  { result <-> is_executable c id g }
+
+    let execute (g: cgraph)
+    requires { valid_cgraph g }
+    requires { cgraph_constraints g }
+    requires { writable g.state.values }
+    requires { valid_range g.cns 0 (to_int g.num_cns) }
+    ensures { exists p:int. steps (ref_graph (old g)) (ref_graph g) p /\ p >= 0 }
+    ensures { is_final (ref_graph g) -> (forall g': cgraph. (exists p:int. steps (ref_graph (old g)) (ref_graph g') p /\ is_final (ref_graph g')) -> ref_graph g' = ref_graph g) }
+    =
+    let ref progress = true in
+    while progress do
+        invariant { count_uncomputed g >= 0 }
+        invariant { valid_cgraph g }
+        invariant { cgraph_constraints g }
+        invariant { exists p:int. steps (ref_graph (old g)) (ref_graph g) p /\ p >= 0 }
+        invariant { is_final (ref_graph g) -> 
+            (forall g': cgraph. (exists p:int. steps (ref_graph (old g)) (ref_graph g') p /\ is_final (ref_graph g')) -> ref_graph g' = ref_graph g) }
+        variant { count_uncomputed g, (if progress then 1 else 0) }
+        let ghost c0 = count_uncomputed g in
+        progress <- false;
+        for i = 0 to to_int g.num_cns - 1 do
+            invariant { count_uncomputed g <= c0 }
+            invariant { progress -> count_uncomputed g < c0 }
+            invariant { valid_cgraph g }
+            invariant { cgraph_constraints g }
+            invariant { exists p:int. steps (ref_graph (old g)) (ref_graph g) p /\ p >= 0 }
+            invariant { is_final (ref_graph g) -> 
+                (forall g': cgraph. (exists p:int. steps (ref_graph (old g)) (ref_graph g') p /\ is_final (ref_graph g')) -> ref_graph g' = ref_graph g) }
+            let c = get_ofs_cn g.cns (Int32.of_int i) in
+            if is_executable c i g then begin
+                let flag = c_execute c i g in
+                if flag then
+                    progress <- true
+            end
+        done
+    done
+end

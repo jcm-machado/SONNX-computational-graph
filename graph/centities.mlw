@@ -1,0 +1,27 @@
+module CEntities
+    use mach.c.C
+    use mach.int.Int32
+    use libtensor.CTensor
+    use entities.Operator
+    use entities.ComputationNode
+
+    type ctensor_value = {
+        value: ctensor;
+        mutable computed: bool;
+    }
+
+    type ctensor_instance = int32
+
+    type ccomputation_node = {
+        op: operator;
+        inputs: ptr ctensor_instance;
+        num_inputs: int32;
+        outputs: ptr ctensor_instance;
+        num_outputs: int32;
+    }
+
+    type cstate = {
+        values: ptr ctensor_value;
+        num_values: int32;
+    }
+end
